@@ -1,18 +1,19 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import ContestantCard from "@/components/ContestantCard";
 import ContestantFormDialog from "@/components/ContestantFormDialog";
 import { Plus, UserCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// todo: remove mock functionality
 interface Contestant {
   id: number;
   name: string;
   imageUrl?: string;
-  totalPoints: number;
   teamId?: number;
-  teamName?: string;
   eliminated?: boolean;
 }
 
@@ -21,48 +22,76 @@ interface Team {
   name: string;
 }
 
-const mockTeams: Team[] = [
-  { id: 1, name: "Tribal Council" },
-  { id: 2, name: "Island Survivors" },
-  { id: 3, name: "Fire Makers" },
-  { id: 4, name: "Hidden Immunity" },
-];
-
-const initialContestants: Contestant[] = [
-  { id: 1, name: "Marcus", totalPoints: 85, teamId: 1, teamName: "Tribal Council" },
-  { id: 2, name: "Elena", totalPoints: 72, teamId: 1, teamName: "Tribal Council" },
-  { id: 3, name: "Jake", totalPoints: 68, teamId: 2, teamName: "Island Survivors" },
-  { id: 4, name: "Sophia", totalPoints: 55, teamId: 2, teamName: "Island Survivors" },
-  { id: 5, name: "Tyler", totalPoints: 48, teamId: 3, teamName: "Fire Makers" },
-  { id: 6, name: "Maya", totalPoints: 42, teamId: 3, teamName: "Fire Makers", eliminated: true },
-  { id: 7, name: "Chris", totalPoints: 35, teamId: 4, teamName: "Hidden Immunity", eliminated: true },
-];
-
 export default function Contestants() {
   const { toast } = useToast();
-  const [contestants, setContestants] = useState<Contestant[]>(initialContestants);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContestant, setEditingContestant] = useState<Contestant | null>(null);
 
-  const handleCreateContestant = (data: { name: string; imageUrl?: string; teamId?: number; eliminated: boolean }) => {
-    const team = mockTeams.find(t => t.id === data.teamId);
-    const newContestant: Contestant = {
-      id: Date.now(),
-      name: data.name,
-      imageUrl: data.imageUrl,
-      totalPoints: 0,
-      teamId: data.teamId,
-      teamName: team?.name,
-      eliminated: data.eliminated,
-    };
-    setContestants([...contestants, newContestant]);
-    toast({
-      title: "Contestant Added",
-      description: `${data.name} has been added to the game.`,
-    });
+  const { data: contestants = [], isLoading } = useQuery<Contestant[]>({
+    queryKey: ["/api/contestants"],
+  });
+
+  const { data: teams = [] } = useQuery<Team[]>({
+    queryKey: ["/api/teams"],
+  });
+
+  const { data: allScores = [] } = useQuery<{ contestantId: number; points: number }[]>({
+    queryKey: ["/api/scores"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: { name: string; imageUrl?: string; teamId?: number; eliminated: boolean }) => 
+      apiRequest("POST", "/api/contestants", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contestants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      toast({ title: "Contestant Added", description: "New contestant has been added." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add contestant.", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<Contestant> }) => 
+      apiRequest("PATCH", `/api/contestants/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contestants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      toast({ title: "Contestant Updated", description: "Contestant has been updated." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update contestant.", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/contestants/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contestants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      toast({ title: "Contestant Removed", description: "Contestant has been removed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to remove contestant.", variant: "destructive" });
+    },
+  });
+
+  const calculateContestantPoints = (contestantId: number) => {
+    return allScores
+      .filter(s => s.contestantId === contestantId)
+      .reduce((sum, s) => sum + s.points, 0);
   };
 
-  const handleEditContestant = (id: number) => {
+  const handleSubmit = (data: { name: string; imageUrl?: string; teamId?: number; eliminated: boolean }) => {
+    if (editingContestant) {
+      updateMutation.mutate({ id: editingContestant.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const handleEdit = (id: number) => {
     const contestant = contestants.find(c => c.id === id);
     if (contestant) {
       setEditingContestant(contestant);
@@ -70,47 +99,35 @@ export default function Contestants() {
     }
   };
 
-  const handleUpdateContestant = (data: { name: string; imageUrl?: string; teamId?: number; eliminated: boolean }) => {
-    if (editingContestant) {
-      const team = mockTeams.find(t => t.id === data.teamId);
-      setContestants(contestants.map(c => 
-        c.id === editingContestant.id 
-          ? { 
-              ...c, 
-              name: data.name, 
-              imageUrl: data.imageUrl,
-              teamId: data.teamId,
-              teamName: team?.name,
-              eliminated: data.eliminated 
-            }
-          : c
-      ));
-      setEditingContestant(null);
-      toast({
-        title: "Contestant Updated",
-        description: `${data.name} has been updated.`,
-      });
-    }
-  };
-
-  const handleDeleteContestant = (id: number) => {
-    const contestant = contestants.find(c => c.id === id);
-    setContestants(contestants.filter(c => c.id !== id));
-    toast({
-      title: "Contestant Removed",
-      description: `${contestant?.name} has been removed from the game.`,
-    });
+  const handleDelete = (id: number) => {
+    deleteMutation.mutate(id);
   };
 
   const handleDialogClose = (open: boolean) => {
     setDialogOpen(open);
-    if (!open) {
-      setEditingContestant(null);
-    }
+    if (!open) setEditingContestant(null);
   };
 
   const activeContestants = contestants.filter(c => !c.eliminated);
   const eliminatedContestants = contestants.filter(c => c.eliminated);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+          <div className="flex items-center justify-between gap-4 mb-8">
+            <Skeleton className="h-10 w-40" />
+            <Skeleton className="h-10 w-36" />
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <Card key={i}><CardContent className="p-4"><Skeleton className="h-16 w-full" /></CardContent></Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -142,11 +159,11 @@ export default function Contestants() {
                   id={contestant.id}
                   name={contestant.name}
                   imageUrl={contestant.imageUrl}
-                  totalPoints={contestant.totalPoints}
-                  teamName={contestant.teamName}
+                  totalPoints={calculateContestantPoints(contestant.id)}
+                  teamName={teams.find(t => t.id === contestant.teamId)?.name}
                   eliminated={contestant.eliminated}
-                  onEdit={handleEditContestant}
-                  onDelete={handleDeleteContestant}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
                 />
               ))}
             </div>
@@ -163,11 +180,11 @@ export default function Contestants() {
                   id={contestant.id}
                   name={contestant.name}
                   imageUrl={contestant.imageUrl}
-                  totalPoints={contestant.totalPoints}
-                  teamName={contestant.teamName}
+                  totalPoints={calculateContestantPoints(contestant.id)}
+                  teamName={teams.find(t => t.id === contestant.teamId)?.name}
                   eliminated={contestant.eliminated}
-                  onEdit={handleEditContestant}
-                  onDelete={handleDeleteContestant}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
                 />
               ))}
             </div>
@@ -189,7 +206,7 @@ export default function Contestants() {
         <ContestantFormDialog
           open={dialogOpen}
           onOpenChange={handleDialogClose}
-          teams={mockTeams}
+          teams={teams}
           initialData={editingContestant ? {
             id: editingContestant.id,
             name: editingContestant.name,
@@ -197,7 +214,7 @@ export default function Contestants() {
             teamId: editingContestant.teamId,
             eliminated: editingContestant.eliminated,
           } : undefined}
-          onSubmit={editingContestant ? handleUpdateContestant : handleCreateContestant}
+          onSubmit={handleSubmit}
         />
       </div>
     </div>
