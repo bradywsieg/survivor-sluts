@@ -41,7 +41,7 @@ export default function TeamFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-[Montserrat] text-xl">
+          <DialogTitle className="font-['Titan_One'] text-xl tracking-wide">
             {isEditing ? "Edit Team" : "Create Team"}
           </DialogTitle>
         </DialogHeader>

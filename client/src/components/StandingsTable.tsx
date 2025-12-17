@@ -20,7 +20,7 @@ export default function StandingsTable({ teams }: StandingsTableProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
-        <CardTitle className="flex items-center gap-2 text-2xl font-bold font-[Montserrat]">
+        <CardTitle className="flex items-center gap-2 text-2xl font-bold font-['Titan_One'] tracking-wide">
           <Trophy className="h-6 w-6 text-primary" />
           Team Standings
         </CardTitle>

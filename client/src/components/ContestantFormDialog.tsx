@@ -61,7 +61,7 @@ export default function ContestantFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-[Montserrat] text-xl">
+          <DialogTitle className="font-['Titan_One'] text-xl tracking-wide">
             {isEditing ? "Edit Contestant" : "Add Contestant"}
           </DialogTitle>
         </DialogHeader>

@@ -118,7 +118,7 @@ export default function Contestants() {
         <div className="flex items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
             <UserCircle className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl md:text-4xl font-bold font-[Montserrat]" data-testid="text-page-title">
+            <h1 className="text-3xl md:text-4xl font-bold font-['Titan_One'] tracking-wide" data-testid="text-page-title">
               Contestants
             </h1>
           </div>

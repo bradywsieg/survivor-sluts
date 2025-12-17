@@ -41,7 +41,7 @@ export default function TeamCard({
               </AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="text-xl font-semibold font-[Montserrat]">{name}</h3>
+              <h3 className="text-xl font-bold font-['Titan_One'] tracking-wide">{name}</h3>
               <div className="flex items-center gap-2 mt-1">
                 <Badge variant="secondary" className="text-sm">
                   {totalPoints} pts
