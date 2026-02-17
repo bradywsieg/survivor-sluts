@@ -28,16 +28,17 @@ interface ContestantPerformanceChartProps {
 function ContestantAvatarTick({ x, y, payload, contestantMap }: any) {
   const contestant = contestantMap[payload.value];
   const imageUrl = contestant?.imageUrl;
+  const contestantId = contestant?.id || 0;
   const name = payload.value;
   const radius = 10;
   const textX = x - radius * 2 - 6;
 
   return (
-    <g transform={`translate(0, 0)`}>
+    <g>
       {imageUrl ? (
         <g>
           <defs>
-            <clipPath id={`contestant-clip-${name.replace(/\s+/g, '-')}`}>
+            <clipPath id={`contestant-clip-${contestantId}`}>
               <circle cx={x - radius - 2} cy={y} r={radius} />
             </clipPath>
           </defs>
@@ -47,7 +48,7 @@ function ContestantAvatarTick({ x, y, payload, contestantMap }: any) {
             y={y - radius}
             width={radius * 2}
             height={radius * 2}
-            clipPath={`url(#contestant-clip-${name.replace(/\s+/g, '-')})`}
+            clipPath={`url(#contestant-clip-${contestantId})`}
             preserveAspectRatio="xMidYMid slice"
           />
         </g>

@@ -65,6 +65,12 @@ shared/           # Shared types and schema
 ```
 
 ## Recent Changes
+- Enhanced ContestantPerformanceChart with Cumulative/Weekly toggle views, week dropdown filter, dynamic height for large casts, contestant avatars on Y-axis, and point labels on bars
+- Updated TeamPointsChart to show team avatar images at line endpoints (falls back to initials circle)
+- Dashboard API now returns teamImages and weeklyContestantScores for chart enhancements
+- Hero banner subtitle updated to "Outwit. Outplay. Outdraft your friends."
+- TeamCard shows contestant profile pictures in roster pills
+- Team editor supports image URL with live preview
 - Added Seasons entity for multi-season support
 - All data (teams, contestants, weeks) scoped to seasons via `seasonId`
 - Season dropdown added to all pages (Dashboard, Teams, Contestants, Scoring)
