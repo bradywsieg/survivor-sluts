@@ -177,12 +177,12 @@ export default function ContestantPerformanceChart({
             Showing scores for Week {activeWeek.weekNumber}
           </p>
         )}
-        <div style={{ height: chartHeight }}>
+        <div style={{ height: chartHeight }} className="w-full min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart 
               data={chartData} 
               layout="vertical" 
-              margin={{ top: 5, right: 50, left: 120, bottom: 5 }}
+              margin={{ top: 5, right: 40, left: 10, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
               <XAxis 

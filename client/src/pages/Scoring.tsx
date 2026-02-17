@@ -259,12 +259,12 @@ export default function Scoring() {
           </Card>
         ) : (
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 space-y-0 pb-4">
               <CardTitle className="flex items-center gap-2 text-2xl font-bold font-['Slackey'] tracking-wide">
                 <Calendar className="h-6 w-6 text-primary" />
                 Enter Scores
               </CardTitle>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto">
                 <Select value={selectedWeekId} onValueChange={setSelectedWeekId}>
                   <SelectTrigger className="w-32" data-testid="select-week">
                     <SelectValue placeholder="Week" />
