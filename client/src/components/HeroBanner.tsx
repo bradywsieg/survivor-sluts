@@ -19,7 +19,7 @@ export default function HeroBanner({
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
         <h1 
-          className="text-3xl md:text-5xl font-bold text-white font-['Slackey'] tracking-wide drop-shadow-lg whitespace-nowrap"
+          className="text-2xl md:text-5xl font-bold text-white font-['Slackey'] tracking-wide drop-shadow-lg md:whitespace-nowrap"
           style={{ textShadow: '3px 3px 0 rgba(0,0,0,0.4)' }}
           data-testid="text-hero-title"
         >
