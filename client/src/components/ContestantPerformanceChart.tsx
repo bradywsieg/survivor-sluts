@@ -182,7 +182,7 @@ export default function ContestantPerformanceChart({
             <BarChart 
               data={chartData} 
               layout="vertical" 
-              margin={{ top: 5, right: 40, left: 10, bottom: 5 }}
+              margin={{ top: 5, right: 40, left: -20, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
               <XAxis 
