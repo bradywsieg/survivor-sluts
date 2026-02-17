@@ -76,7 +76,7 @@ function ContestantAvatarTick({ x, y, payload, contestantMap }: any) {
         fill="hsl(var(--muted-foreground))"
         fontSize={12}
       >
-        {name.length > 18 ? name.substring(0, 16) + "..." : name}
+        {name}
       </text>
     </g>
   );
@@ -182,7 +182,7 @@ export default function ContestantPerformanceChart({
             <BarChart 
               data={chartData} 
               layout="vertical" 
-              margin={{ top: 5, right: 40, left: -20, bottom: 5 }}
+              margin={{ top: 5, right: 40, left: 0, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
               <XAxis 
@@ -192,7 +192,7 @@ export default function ContestantPerformanceChart({
               <YAxis 
                 type="category" 
                 dataKey="name" 
-                width={115}
+                width={200}
                 tick={(props: any) => (
                   <ContestantAvatarTick {...props} contestantMap={contestantMap} />
                 )}

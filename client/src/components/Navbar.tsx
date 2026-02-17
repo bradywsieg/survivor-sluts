@@ -26,7 +26,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 md:px-6 h-full flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2" data-testid="link-home">
           <Palmtree className="h-6 w-6 text-primary" />
-          <span className="font-bold text-xl font-['Slackey'] tracking-wide text-primary">Survivor Fantasy</span>
+          <span className="font-bold text-xl font-['Slackey'] tracking-wide text-primary">Survivor Sluts</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-1">
