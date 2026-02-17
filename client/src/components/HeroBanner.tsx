@@ -7,7 +7,7 @@ interface HeroBannerProps {
 
 export default function HeroBanner({ 
   title = "Survivor Fantasy League", 
-  subtitle = "Track your tribe, dominate the game" 
+  subtitle = "Outwit. Outplay. Outdraft your friends." 
 }: HeroBannerProps) {
   return (
     <div className="relative h-64 md:h-80 overflow-hidden">
