@@ -14,7 +14,7 @@ interface TeamFormDialogProps {
     name: string;
     imageUrl?: string | null;
   };
-  onSubmit: (data: { name: string; imageUrl?: string }) => void;
+  onSubmit: (data: { name: string; imageUrl?: string | null }) => void;
 }
 
 export default function TeamFormDialog({ 
@@ -37,7 +37,7 @@ export default function TeamFormDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      onSubmit({ name: name.trim(), imageUrl: imageUrl.trim() || undefined });
+      onSubmit({ name: name.trim(), imageUrl: imageUrl.trim() || null });
       onOpenChange(false);
     }
   };

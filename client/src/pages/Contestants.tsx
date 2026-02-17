@@ -65,7 +65,7 @@ export default function Contestants() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; imageUrl?: string; teamId?: number; eliminated: boolean }) => 
+    mutationFn: (data: { name: string; imageUrl?: string | null; teamId?: number; eliminated: boolean }) => 
       apiRequest("POST", "/api/contestants", { ...data, seasonId: selectedSeasonId ? parseInt(selectedSeasonId) : undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contestants"] });
@@ -108,7 +108,7 @@ export default function Contestants() {
       .reduce((sum, s) => sum + s.points, 0);
   };
 
-  const handleSubmit = (data: { name: string; imageUrl?: string; teamId?: number; eliminated: boolean }) => {
+  const handleSubmit = (data: { name: string; imageUrl?: string | null; teamId?: number; eliminated: boolean }) => {
     if (editingContestant) {
       updateMutation.mutate({ id: editingContestant.id, data });
     } else {

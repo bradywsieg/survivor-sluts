@@ -24,7 +24,7 @@ interface ContestantFormDialogProps {
     teamId?: number;
     eliminated?: boolean;
   };
-  onSubmit: (data: { name: string; imageUrl?: string; teamId?: number; eliminated: boolean }) => void;
+  onSubmit: (data: { name: string; imageUrl?: string | null; teamId?: number; eliminated: boolean }) => void;
 }
 
 export default function ContestantFormDialog({ 
@@ -54,7 +54,7 @@ export default function ContestantFormDialog({
     if (name.trim()) {
       onSubmit({ 
         name: name.trim(), 
-        imageUrl: imageUrl.trim() || undefined,
+        imageUrl: imageUrl.trim() || null,
         teamId: teamId ? parseInt(teamId) : undefined,
         eliminated
       });

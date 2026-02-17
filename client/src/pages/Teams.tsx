@@ -76,7 +76,7 @@ export default function Teams() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; imageUrl?: string }) => 
+    mutationFn: (data: { name: string; imageUrl?: string | null }) => 
       apiRequest("POST", "/api/teams", { ...data, seasonId: selectedSeasonId ? parseInt(selectedSeasonId) : undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
@@ -89,7 +89,7 @@ export default function Teams() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name: string; imageUrl?: string } }) => 
+    mutationFn: ({ id, data }: { id: number; data: { name: string; imageUrl?: string | null } }) => 
       apiRequest("PATCH", `/api/teams/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
@@ -124,7 +124,7 @@ export default function Teams() {
     return contestantPoints + bonusPoints;
   };
 
-  const handleSubmit = (data: { name: string; imageUrl?: string }) => {
+  const handleSubmit = (data: { name: string; imageUrl?: string | null }) => {
     if (editingTeam) {
       updateMutation.mutate({ id: editingTeam.id, data });
     } else {
