@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import ContestantCard from "@/components/ContestantCard";
 import ContestantFormDialog from "@/components/ContestantFormDialog";
+import SeasonSelector from "@/components/SeasonSelector";
+import { useSeason } from "@/hooks/use-season";
 import { Plus, UserCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -12,9 +14,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface Contestant {
   id: number;
   name: string;
-  imageUrl?: string;
-  teamId?: number;
+  imageUrl?: string | null;
+  teamId?: number | null;
   eliminated?: boolean;
+  seasonId?: number | null;
 }
 
 interface Team {
@@ -26,22 +29,44 @@ export default function Contestants() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContestant, setEditingContestant] = useState<Contestant | null>(null);
+  const { seasons, selectedSeasonId, setSelectedSeasonId } = useSeason();
 
   const { data: contestants = [], isLoading } = useQuery<Contestant[]>({
-    queryKey: ["/api/contestants"],
+    queryKey: ["/api/contestants", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const url = selectedSeasonId ? `/api/contestants?seasonId=${selectedSeasonId}` : `/api/contestants`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId || seasons.length === 0,
   });
 
   const { data: teams = [] } = useQuery<Team[]>({
-    queryKey: ["/api/teams"],
+    queryKey: ["/api/teams", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const url = selectedSeasonId ? `/api/teams?seasonId=${selectedSeasonId}` : `/api/teams`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId || seasons.length === 0,
   });
 
   const { data: allScores = [] } = useQuery<{ contestantId: number; points: number }[]>({
-    queryKey: ["/api/scores"],
+    queryKey: ["/api/scores", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const url = selectedSeasonId ? `/api/scores?seasonId=${selectedSeasonId}` : `/api/scores`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId || seasons.length === 0,
   });
 
   const createMutation = useMutation({
     mutationFn: (data: { name: string; imageUrl?: string; teamId?: number; eliminated: boolean }) => 
-      apiRequest("POST", "/api/contestants", data),
+      apiRequest("POST", "/api/contestants", { ...data, seasonId: selectedSeasonId ? parseInt(selectedSeasonId) : undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contestants"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -132,21 +157,28 @@ export default function Contestants() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
-        <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
           <div className="flex items-center gap-3">
             <UserCircle className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl md:text-4xl font-bold font-['Titan_One'] tracking-wide" data-testid="text-page-title">
+            <h1 className="text-3xl md:text-4xl font-bold font-['Slackey'] tracking-wide" data-testid="text-page-title">
               Contestants
             </h1>
           </div>
-          <Button 
-            onClick={() => setDialogOpen(true)} 
-            className="gap-2"
-            data-testid="button-add-contestant"
-          >
-            <Plus className="h-4 w-4" />
-            Add Contestant
-          </Button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <SeasonSelector
+              seasons={seasons}
+              selectedSeasonId={selectedSeasonId}
+              onSeasonChange={setSelectedSeasonId}
+            />
+            <Button 
+              onClick={() => setDialogOpen(true)} 
+              className="gap-2"
+              data-testid="button-add-contestant"
+            >
+              <Plus className="h-4 w-4" />
+              Add Contestant
+            </Button>
+          </div>
         </div>
 
         {activeContestants.length > 0 && (
@@ -158,7 +190,7 @@ export default function Contestants() {
                   key={contestant.id}
                   id={contestant.id}
                   name={contestant.name}
-                  imageUrl={contestant.imageUrl}
+                  imageUrl={contestant.imageUrl || undefined}
                   totalPoints={calculateContestantPoints(contestant.id)}
                   teamName={teams.find(t => t.id === contestant.teamId)?.name}
                   eliminated={contestant.eliminated}
@@ -179,7 +211,7 @@ export default function Contestants() {
                   key={contestant.id}
                   id={contestant.id}
                   name={contestant.name}
-                  imageUrl={contestant.imageUrl}
+                  imageUrl={contestant.imageUrl || undefined}
                   totalPoints={calculateContestantPoints(contestant.id)}
                   teamName={teams.find(t => t.id === contestant.teamId)?.name}
                   eliminated={contestant.eliminated}
@@ -210,8 +242,8 @@ export default function Contestants() {
           initialData={editingContestant ? {
             id: editingContestant.id,
             name: editingContestant.name,
-            imageUrl: editingContestant.imageUrl,
-            teamId: editingContestant.teamId,
+            imageUrl: editingContestant.imageUrl || undefined,
+            teamId: editingContestant.teamId || undefined,
             eliminated: editingContestant.eliminated,
           } : undefined}
           onSubmit={handleSubmit}

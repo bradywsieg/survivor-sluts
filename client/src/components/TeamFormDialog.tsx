@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ interface TeamFormDialogProps {
   initialData?: {
     id?: number;
     name: string;
-    imageUrl?: string;
+    imageUrl?: string | null;
   };
   onSubmit: (data: { name: string; imageUrl?: string }) => void;
 }
@@ -23,16 +23,21 @@ export default function TeamFormDialog({
   initialData,
   onSubmit 
 }: TeamFormDialogProps) {
-  const [name, setName] = useState(initialData?.name || "");
-  const [imageUrl, setImageUrl] = useState(initialData?.imageUrl || "");
+  const [name, setName] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const isEditing = !!initialData?.id;
+
+  useEffect(() => {
+    if (open) {
+      setName(initialData?.name || "");
+      setImageUrl(initialData?.imageUrl || "");
+    }
+  }, [open, initialData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
       onSubmit({ name: name.trim(), imageUrl: imageUrl.trim() || undefined });
-      setName("");
-      setImageUrl("");
       onOpenChange(false);
     }
   };
@@ -41,14 +46,17 @@ export default function TeamFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-['Titan_One'] text-xl tracking-wide">
+          <DialogTitle className="font-['Slackey'] text-xl tracking-wide">
             {isEditing ? "Edit Team" : "Create Team"}
           </DialogTitle>
+          <DialogDescription>
+            {isEditing ? "Update team details below." : "Fill in the details to create a new team."}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="flex items-center gap-6">
             <Avatar className="h-20 w-20">
-              <AvatarImage src={imageUrl} alt={name || "Team"} />
+              <AvatarImage src={imageUrl || undefined} alt={name || "Team"} />
               <AvatarFallback className="bg-primary/10 text-primary text-2xl font-bold">
                 {name ? name.substring(0, 2).toUpperCase() : "TM"}
               </AvatarFallback>

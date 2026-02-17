@@ -1,5 +1,6 @@
 import { 
-  teams, contestants, weeks, contestantScores, teamBonuses,
+  seasons, teams, contestants, weeks, contestantScores, teamBonuses,
+  type Season, type InsertSeason,
   type Team, type InsertTeam,
   type Contestant, type InsertContestant,
   type Week, type InsertWeek,
@@ -7,45 +8,80 @@ import {
   type TeamBonus, type InsertTeamBonus
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 
 export interface IStorage {
-  // Teams
-  getTeams(): Promise<Team[]>;
+  getSeasons(): Promise<Season[]>;
+  getSeason(id: number): Promise<Season | undefined>;
+  getLatestSeason(): Promise<Season | undefined>;
+  createSeason(season: InsertSeason): Promise<Season>;
+  updateSeason(id: number, season: Partial<InsertSeason>): Promise<Season | undefined>;
+  deleteSeason(id: number): Promise<boolean>;
+
+  getTeams(seasonId?: number): Promise<Team[]>;
   getTeam(id: number): Promise<Team | undefined>;
   createTeam(team: InsertTeam): Promise<Team>;
   updateTeam(id: number, team: Partial<InsertTeam>): Promise<Team | undefined>;
   deleteTeam(id: number): Promise<boolean>;
 
-  // Contestants
-  getContestants(): Promise<Contestant[]>;
+  getContestants(seasonId?: number): Promise<Contestant[]>;
   getContestant(id: number): Promise<Contestant | undefined>;
   getContestantsByTeam(teamId: number): Promise<Contestant[]>;
   createContestant(contestant: InsertContestant): Promise<Contestant>;
   updateContestant(id: number, contestant: Partial<InsertContestant>): Promise<Contestant | undefined>;
   deleteContestant(id: number): Promise<boolean>;
 
-  // Weeks
-  getWeeks(): Promise<Week[]>;
+  getWeeks(seasonId?: number): Promise<Week[]>;
   getWeek(id: number): Promise<Week | undefined>;
-  getWeekByNumber(weekNumber: number): Promise<Week | undefined>;
+  getWeekByNumber(weekNumber: number, seasonId?: number): Promise<Week | undefined>;
   createWeek(week: InsertWeek): Promise<Week>;
   deleteWeek(id: number): Promise<boolean>;
 
-  // Contestant Scores
   getContestantScores(): Promise<ContestantScore[]>;
   getContestantScoresByWeek(weekId: number): Promise<ContestantScore[]>;
+  getContestantScoresBySeason(seasonId: number): Promise<ContestantScore[]>;
   upsertContestantScore(score: InsertContestantScore): Promise<ContestantScore>;
 
-  // Team Bonuses
   getTeamBonuses(): Promise<TeamBonus[]>;
   getTeamBonusesByWeek(weekId: number): Promise<TeamBonus[]>;
+  getTeamBonusesBySeason(seasonId: number): Promise<TeamBonus[]>;
   upsertTeamBonus(bonus: InsertTeamBonus): Promise<TeamBonus>;
 }
 
 export class DatabaseStorage implements IStorage {
-  // Teams
-  async getTeams(): Promise<Team[]> {
+  async getSeasons(): Promise<Season[]> {
+    return await db.select().from(seasons).orderBy(desc(seasons.number));
+  }
+
+  async getSeason(id: number): Promise<Season | undefined> {
+    const [season] = await db.select().from(seasons).where(eq(seasons.id, id));
+    return season;
+  }
+
+  async getLatestSeason(): Promise<Season | undefined> {
+    const [season] = await db.select().from(seasons).orderBy(desc(seasons.number)).limit(1);
+    return season;
+  }
+
+  async createSeason(season: InsertSeason): Promise<Season> {
+    const [newSeason] = await db.insert(seasons).values(season).returning();
+    return newSeason;
+  }
+
+  async updateSeason(id: number, season: Partial<InsertSeason>): Promise<Season | undefined> {
+    const [updated] = await db.update(seasons).set(season).where(eq(seasons.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSeason(id: number): Promise<boolean> {
+    const result = await db.delete(seasons).where(eq(seasons.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getTeams(seasonId?: number): Promise<Team[]> {
+    if (seasonId) {
+      return await db.select().from(teams).where(eq(teams.seasonId, seasonId));
+    }
     return await db.select().from(teams);
   }
 
@@ -69,8 +105,10 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount ?? 0) > 0;
   }
 
-  // Contestants
-  async getContestants(): Promise<Contestant[]> {
+  async getContestants(seasonId?: number): Promise<Contestant[]> {
+    if (seasonId) {
+      return await db.select().from(contestants).where(eq(contestants.seasonId, seasonId));
+    }
     return await db.select().from(contestants);
   }
 
@@ -94,14 +132,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteContestant(id: number): Promise<boolean> {
-    // Delete associated scores first
     await db.delete(contestantScores).where(eq(contestantScores.contestantId, id));
     const result = await db.delete(contestants).where(eq(contestants.id, id));
     return (result.rowCount ?? 0) > 0;
   }
 
-  // Weeks
-  async getWeeks(): Promise<Week[]> {
+  async getWeeks(seasonId?: number): Promise<Week[]> {
+    if (seasonId) {
+      return await db.select().from(weeks).where(eq(weeks.seasonId, seasonId)).orderBy(weeks.weekNumber);
+    }
     return await db.select().from(weeks).orderBy(weeks.weekNumber);
   }
 
@@ -110,7 +149,11 @@ export class DatabaseStorage implements IStorage {
     return week;
   }
 
-  async getWeekByNumber(weekNumber: number): Promise<Week | undefined> {
+  async getWeekByNumber(weekNumber: number, seasonId?: number): Promise<Week | undefined> {
+    if (seasonId) {
+      const [week] = await db.select().from(weeks).where(and(eq(weeks.weekNumber, weekNumber), eq(weeks.seasonId, seasonId)));
+      return week;
+    }
     const [week] = await db.select().from(weeks).where(eq(weeks.weekNumber, weekNumber));
     return week;
   }
@@ -121,14 +164,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteWeek(id: number): Promise<boolean> {
-    // Delete associated scores and bonuses first
     await db.delete(contestantScores).where(eq(contestantScores.weekId, id));
     await db.delete(teamBonuses).where(eq(teamBonuses.weekId, id));
     const result = await db.delete(weeks).where(eq(weeks.id, id));
     return (result.rowCount ?? 0) > 0;
   }
 
-  // Contestant Scores
   async getContestantScores(): Promise<ContestantScore[]> {
     return await db.select().from(contestantScores);
   }
@@ -137,8 +178,15 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(contestantScores).where(eq(contestantScores.weekId, weekId));
   }
 
+  async getContestantScoresBySeason(seasonId: number): Promise<ContestantScore[]> {
+    const seasonWeeks = await this.getWeeks(seasonId);
+    const weekIds = seasonWeeks.map(w => w.id);
+    if (weekIds.length === 0) return [];
+    const allScores = await db.select().from(contestantScores);
+    return allScores.filter(s => weekIds.includes(s.weekId));
+  }
+
   async upsertContestantScore(score: InsertContestantScore): Promise<ContestantScore> {
-    // Check if exists
     const [existing] = await db.select().from(contestantScores)
       .where(and(
         eq(contestantScores.contestantId, score.contestantId),
@@ -157,7 +205,6 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // Team Bonuses
   async getTeamBonuses(): Promise<TeamBonus[]> {
     return await db.select().from(teamBonuses);
   }
@@ -166,8 +213,15 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(teamBonuses).where(eq(teamBonuses.weekId, weekId));
   }
 
+  async getTeamBonusesBySeason(seasonId: number): Promise<TeamBonus[]> {
+    const seasonWeeks = await this.getWeeks(seasonId);
+    const weekIds = seasonWeeks.map(w => w.id);
+    if (weekIds.length === 0) return [];
+    const allBonuses = await db.select().from(teamBonuses);
+    return allBonuses.filter(b => weekIds.includes(b.weekId));
+  }
+
   async upsertTeamBonus(bonus: InsertTeamBonus): Promise<TeamBonus> {
-    // Check if exists
     const [existing] = await db.select().from(teamBonuses)
       .where(and(
         eq(teamBonuses.teamId, bonus.teamId),

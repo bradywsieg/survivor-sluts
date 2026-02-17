@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Palmtree, Trophy, Users, UserCircle, Calendar, Menu, X } from "lucide-react";
+import { Palmtree, Trophy, Users, UserCircle, Calendar, Menu, X, Tv } from "lucide-react";
 import { useState } from "react";
 
 interface NavItem {
@@ -14,6 +14,7 @@ const navItems: NavItem[] = [
   { label: "Teams", href: "/teams", icon: Users },
   { label: "Contestants", href: "/contestants", icon: UserCircle },
   { label: "Scoring", href: "/scoring", icon: Calendar },
+  { label: "Seasons", href: "/seasons", icon: Tv },
 ];
 
 export default function Navbar() {
@@ -25,7 +26,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 md:px-6 h-full flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2" data-testid="link-home">
           <Palmtree className="h-6 w-6 text-primary" />
-          <span className="font-bold text-xl font-['Titan_One'] tracking-wide text-primary">Survivor Fantasy</span>
+          <span className="font-bold text-xl font-['Slackey'] tracking-wide text-primary">Survivor Fantasy</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-1">

@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import TeamCard from "@/components/TeamCard";
 import TeamFormDialog from "@/components/TeamFormDialog";
+import SeasonSelector from "@/components/SeasonSelector";
+import { useSeason } from "@/hooks/use-season";
 import { Plus, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -20,32 +22,62 @@ interface Team {
   id: number;
   name: string;
   imageUrl?: string;
+  seasonId?: number;
 }
 
 export default function Teams() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const { seasons, selectedSeasonId, setSelectedSeasonId } = useSeason();
 
   const { data: teams = [], isLoading: teamsLoading } = useQuery<Team[]>({
-    queryKey: ["/api/teams"],
+    queryKey: ["/api/teams", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const url = selectedSeasonId ? `/api/teams?seasonId=${selectedSeasonId}` : `/api/teams`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId || seasons.length === 0,
   });
 
   const { data: contestants = [] } = useQuery<Contestant[]>({
-    queryKey: ["/api/contestants"],
+    queryKey: ["/api/contestants", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const url = selectedSeasonId ? `/api/contestants?seasonId=${selectedSeasonId}` : `/api/contestants`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId || seasons.length === 0,
   });
 
   const { data: allScores = [] } = useQuery<{ contestantId: number; points: number }[]>({
-    queryKey: ["/api/scores"],
+    queryKey: ["/api/scores", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const url = selectedSeasonId ? `/api/scores?seasonId=${selectedSeasonId}` : `/api/scores`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId || seasons.length === 0,
   });
 
   const { data: allBonuses = [] } = useQuery<{ teamId: number; bonus: number }[]>({
-    queryKey: ["/api/bonuses"],
+    queryKey: ["/api/bonuses", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const url = selectedSeasonId ? `/api/bonuses?seasonId=${selectedSeasonId}` : `/api/bonuses`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId || seasons.length === 0,
   });
 
   const createMutation = useMutation({
     mutationFn: (data: { name: string; imageUrl?: string }) => 
-      apiRequest("POST", "/api/teams", data),
+      apiRequest("POST", "/api/teams", { ...data, seasonId: selectedSeasonId ? parseInt(selectedSeasonId) : undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -138,21 +170,28 @@ export default function Teams() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
-        <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
           <div className="flex items-center gap-3">
             <Users className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl md:text-4xl font-bold font-['Titan_One'] tracking-wide" data-testid="text-page-title">
+            <h1 className="text-3xl md:text-4xl font-bold font-['Slackey'] tracking-wide" data-testid="text-page-title">
               Teams
             </h1>
           </div>
-          <Button 
-            onClick={() => setDialogOpen(true)} 
-            className="gap-2"
-            data-testid="button-add-team"
-          >
-            <Plus className="h-4 w-4" />
-            Add Team
-          </Button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <SeasonSelector
+              seasons={seasons}
+              selectedSeasonId={selectedSeasonId}
+              onSeasonChange={setSelectedSeasonId}
+            />
+            <Button 
+              onClick={() => setDialogOpen(true)} 
+              className="gap-2"
+              data-testid="button-add-team"
+            >
+              <Plus className="h-4 w-4" />
+              Add Team
+            </Button>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">

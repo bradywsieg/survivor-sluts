@@ -91,7 +91,7 @@ export default function WeeklyScoring({
     <div className="space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
-          <CardTitle className="flex items-center gap-2 text-2xl font-bold font-['Titan_One'] tracking-wide">
+          <CardTitle className="flex items-center gap-2 text-2xl font-bold font-['Slackey'] tracking-wide">
             <Calendar className="h-6 w-6 text-primary" />
             Weekly Scoring
           </CardTitle>

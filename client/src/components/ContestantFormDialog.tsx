@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,11 +34,20 @@ export default function ContestantFormDialog({
   initialData,
   onSubmit 
 }: ContestantFormDialogProps) {
-  const [name, setName] = useState(initialData?.name || "");
-  const [imageUrl, setImageUrl] = useState(initialData?.imageUrl || "");
-  const [teamId, setTeamId] = useState<string>(initialData?.teamId?.toString() || "");
-  const [eliminated, setEliminated] = useState(initialData?.eliminated || false);
+  const [name, setName] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [teamId, setTeamId] = useState<string>("");
+  const [eliminated, setEliminated] = useState(false);
   const isEditing = !!initialData?.id;
+
+  useEffect(() => {
+    if (open) {
+      setName(initialData?.name || "");
+      setImageUrl(initialData?.imageUrl || "");
+      setTeamId(initialData?.teamId?.toString() || "");
+      setEliminated(initialData?.eliminated || false);
+    }
+  }, [open, initialData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,10 +58,6 @@ export default function ContestantFormDialog({
         teamId: teamId ? parseInt(teamId) : undefined,
         eliminated
       });
-      setName("");
-      setImageUrl("");
-      setTeamId("");
-      setEliminated(false);
       onOpenChange(false);
     }
   };
@@ -61,16 +66,19 @@ export default function ContestantFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-['Titan_One'] text-xl tracking-wide">
+          <DialogTitle className="font-['Slackey'] text-xl tracking-wide">
             {isEditing ? "Edit Contestant" : "Add Contestant"}
           </DialogTitle>
+          <DialogDescription>
+            {isEditing ? "Update contestant details below." : "Fill in the details to add a new contestant."}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="flex items-start gap-6">
             <Avatar className="h-20 w-20">
-              <AvatarImage src={imageUrl} alt={name || "Contestant"} />
+              <AvatarImage src={imageUrl || undefined} alt={name || "Contestant"} />
               <AvatarFallback className="bg-primary/10 text-primary text-2xl font-bold">
-                {name ? name.substring(0, 2).toUpperCase() : "??"}
+                {name ? name.substring(0, 2).toUpperCase() : "CN"}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 space-y-4">

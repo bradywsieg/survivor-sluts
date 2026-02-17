@@ -8,6 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import Teams from "@/pages/Teams";
 import Contestants from "@/pages/Contestants";
 import Scoring from "@/pages/Scoring";
+import Seasons from "@/pages/Seasons";
 import Navbar from "@/components/Navbar";
 
 function Router() {
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/teams" component={Teams} />
       <Route path="/contestants" component={Contestants} />
       <Route path="/scoring" component={Scoring} />
+      <Route path="/seasons" component={Seasons} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -1,17 +1,93 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTeamSchema, insertContestantSchema, insertWeekSchema } from "@shared/schema";
+import { insertTeamSchema, insertContestantSchema, insertWeekSchema, insertSeasonSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Seasons API
+  app.get("/api/seasons", async (req, res) => {
+    try {
+      const seasons = await storage.getSeasons();
+      res.json(seasons);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch seasons" });
+    }
+  });
+
+  app.get("/api/seasons/latest", async (req, res) => {
+    try {
+      const season = await storage.getLatestSeason();
+      res.json(season || null);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch latest season" });
+    }
+  });
+
+  app.get("/api/seasons/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const season = await storage.getSeason(id);
+      if (!season) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+      res.json(season);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch season" });
+    }
+  });
+
+  app.post("/api/seasons", async (req, res) => {
+    try {
+      const parsed = insertSeasonSchema.parse(req.body);
+      const season = await storage.createSeason(parsed);
+      res.status(201).json(season);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create season" });
+    }
+  });
+
+  app.patch("/api/seasons/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const parsed = insertSeasonSchema.partial().parse(req.body);
+      const season = await storage.updateSeason(id, parsed);
+      if (!season) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+      res.json(season);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update season" });
+    }
+  });
+
+  app.delete("/api/seasons/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteSeason(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete season" });
+    }
+  });
+
   // Teams API
   app.get("/api/teams", async (req, res) => {
     try {
-      const teams = await storage.getTeams();
+      const seasonId = req.query.seasonId ? parseInt(req.query.seasonId as string) : undefined;
+      const teams = await storage.getTeams(seasonId);
       res.json(teams);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch teams" });
@@ -77,7 +153,8 @@ export async function registerRoutes(
   // Contestants API
   app.get("/api/contestants", async (req, res) => {
     try {
-      const contestants = await storage.getContestants();
+      const seasonId = req.query.seasonId ? parseInt(req.query.seasonId as string) : undefined;
+      const contestants = await storage.getContestants(seasonId);
       res.json(contestants);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch contestants" });
@@ -153,7 +230,8 @@ export async function registerRoutes(
   // Weeks API
   app.get("/api/weeks", async (req, res) => {
     try {
-      const weeks = await storage.getWeeks();
+      const seasonId = req.query.seasonId ? parseInt(req.query.seasonId as string) : undefined;
+      const weeks = await storage.getWeeks(seasonId);
       res.json(weeks);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch weeks" });
@@ -189,6 +267,11 @@ export async function registerRoutes(
   // Scores API
   app.get("/api/scores", async (req, res) => {
     try {
+      const seasonId = req.query.seasonId ? parseInt(req.query.seasonId as string) : undefined;
+      if (seasonId) {
+        const scores = await storage.getContestantScoresBySeason(seasonId);
+        return res.json(scores);
+      }
       const scores = await storage.getContestantScores();
       res.json(scores);
     } catch (error) {
@@ -216,7 +299,6 @@ export async function registerRoutes(
     }
   });
 
-  // Bulk save scores
   app.post("/api/weeks/:weekId/scores", async (req, res) => {
     try {
       const weekId = parseInt(req.params.weekId);
@@ -250,6 +332,11 @@ export async function registerRoutes(
   // Team Bonuses API
   app.get("/api/bonuses", async (req, res) => {
     try {
+      const seasonId = req.query.seasonId ? parseInt(req.query.seasonId as string) : undefined;
+      if (seasonId) {
+        const bonuses = await storage.getTeamBonusesBySeason(seasonId);
+        return res.json(bonuses);
+      }
       const bonuses = await storage.getTeamBonuses();
       res.json(bonuses);
     } catch (error) {
@@ -267,16 +354,23 @@ export async function registerRoutes(
     }
   });
 
-  // Dashboard data - aggregated view
+  // Dashboard data - aggregated view with season filtering
   app.get("/api/dashboard", async (req, res) => {
     try {
-      const teams = await storage.getTeams();
-      const contestants = await storage.getContestants();
-      const weeks = await storage.getWeeks();
-      const allScores = await storage.getContestantScores();
-      const allBonuses = await storage.getTeamBonuses();
+      const seasonId = req.query.seasonId ? parseInt(req.query.seasonId as string) : undefined;
+      
+      let resolvedSeasonId = seasonId;
+      if (!resolvedSeasonId) {
+        const latest = await storage.getLatestSeason();
+        resolvedSeasonId = latest?.id;
+      }
 
-      // Calculate team totals
+      const teams = resolvedSeasonId ? await storage.getTeams(resolvedSeasonId) : await storage.getTeams();
+      const contestants = resolvedSeasonId ? await storage.getContestants(resolvedSeasonId) : await storage.getContestants();
+      const weeks = resolvedSeasonId ? await storage.getWeeks(resolvedSeasonId) : await storage.getWeeks();
+      const allScores = resolvedSeasonId ? await storage.getContestantScoresBySeason(resolvedSeasonId) : await storage.getContestantScores();
+      const allBonuses = resolvedSeasonId ? await storage.getTeamBonusesBySeason(resolvedSeasonId) : await storage.getTeamBonuses();
+
       const teamTotals = teams.map(team => {
         const teamContestants = contestants.filter(c => c.teamId === team.id);
         const contestantPoints = allScores
@@ -293,7 +387,6 @@ export async function registerRoutes(
         };
       });
 
-      // Calculate contestant totals
       const contestantTotals = contestants.map(contestant => {
         const points = allScores
           .filter(s => s.contestantId === contestant.id)
@@ -307,7 +400,6 @@ export async function registerRoutes(
         };
       });
 
-      // Calculate weekly progression for chart
       const weeklyData = weeks.map(week => {
         const weekScores = allScores.filter(s => s.weekId === week.id);
         const weekBonuses = allBonuses.filter(b => b.weekId === week.id);
@@ -326,7 +418,6 @@ export async function registerRoutes(
         return dataPoint;
       });
 
-      // Calculate cumulative totals for chart
       const cumulativeData = weeklyData.map((weekData, index) => {
         const cumulative: Record<string, string | number> = { week: weekData.week };
         teams.forEach(team => {

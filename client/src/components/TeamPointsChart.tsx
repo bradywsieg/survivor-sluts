@@ -24,7 +24,7 @@ export default function TeamPointsChart({ data, teamNames }: TeamPointsChartProp
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
-        <CardTitle className="flex items-center gap-2 text-2xl font-bold font-['Titan_One'] tracking-wide">
+        <CardTitle className="flex items-center gap-2 text-2xl font-bold font-['Slackey'] tracking-wide">
           <TrendingUp className="h-6 w-6 text-primary" />
           Points by Week
         </CardTitle>

@@ -3,6 +3,8 @@ import HeroBanner from "@/components/HeroBanner";
 import StandingsTable from "@/components/StandingsTable";
 import TeamPointsChart from "@/components/TeamPointsChart";
 import ContestantPerformanceChart from "@/components/ContestantPerformanceChart";
+import SeasonSelector from "@/components/SeasonSelector";
+import { useSeason } from "@/hooks/use-season";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
@@ -15,8 +17,17 @@ interface DashboardData {
 }
 
 export default function Dashboard() {
+  const { seasons, selectedSeasonId, setSelectedSeasonId } = useSeason();
+
   const { data, isLoading, error } = useQuery<DashboardData>({
-    queryKey: ["/api/dashboard"],
+    queryKey: ["/api/dashboard", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const url = selectedSeasonId ? `/api/dashboard?seasonId=${selectedSeasonId}` : `/api/dashboard`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId || seasons.length === 0,
   });
 
   if (isLoading) {
@@ -70,6 +81,14 @@ export default function Dashboard() {
       <HeroBanner />
       
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+        <div className="flex items-center justify-end mb-6">
+          <SeasonSelector
+            seasons={seasons}
+            selectedSeasonId={selectedSeasonId}
+            onSeasonChange={setSelectedSeasonId}
+          />
+        </div>
+
         <div className="grid lg:grid-cols-2 gap-8">
           <StandingsTable teams={teams} />
           {weeklyData.length > 0 && teamNames.length > 0 ? (

@@ -2,7 +2,7 @@
 
 ## Overview
 
-A fantasy sports-style web application for tracking Survivor TV show leagues. Users manage teams, contestants, and weekly scoring to track standings and performance across a season. The app features a tropical/adventure theme inspired by the Survivor TV show aesthetic.
+A fantasy sports-style web application for tracking Survivor TV show leagues across multiple seasons. Users manage teams, contestants, and weekly scoring to track standings and performance. The app features a tropical/adventure theme inspired by the Survivor TV show aesthetic. No authentication required - all users can edit data.
 
 ## User Preferences
 
@@ -25,16 +25,26 @@ Preferred communication style: Simple, everyday language.
 - **Schema Validation**: Zod with drizzle-zod for type-safe validation
 
 ### Data Model
-The application manages five core entities:
-1. **Teams** - Fantasy league teams with name and image
-2. **Contestants** - Survivor show contestants, assigned to teams, can be eliminated
-3. **Weeks** - Episode/week tracking for scoring
-4. **Contestant Scores** - Points earned by contestants per week
-5. **Team Bonuses** - Additional team-level bonus points per week
+The application manages six core entities:
+1. **Seasons** - Seasons of the Survivor show (e.g., Season 49, Season 50)
+2. **Teams** - Fantasy league teams with name, image, and season association
+3. **Contestants** - Survivor show contestants, assigned to teams and seasons, can be eliminated
+4. **Weeks** - Episode/week tracking for scoring, tied to a season
+5. **Contestant Scores** - Points earned by contestants per week
+6. **Team Bonuses** - Additional team-level bonus points per week
+
+All teams, contestants, and weeks are scoped to a season via `seasonId` foreign key.
+
+### Pages
+- `/` - Dashboard with hero banner, standings table, charts, season dropdown
+- `/teams` - Teams CRUD management with season filtering
+- `/contestants` - Contestants CRUD management with season filtering
+- `/scoring` - Weekly scoring entry with season and week selectors
+- `/seasons` - Seasons CRUD management
 
 ### Design System
 - Survivor/adventure theme with tropical motifs
-- Custom fonts: Titan One (headings), Inter (body), Architects Daughter (accent)
+- Custom fonts: Slackey (headings - Survivor-style), Inter (body), Architects Daughter (accent)
 - HSL-based color system with CSS custom properties for theming
 - Responsive layout with mobile-first approach
 
@@ -42,9 +52,9 @@ The application manages five core entities:
 ```
 client/           # React frontend
   src/
-    components/   # Reusable UI components
-    pages/        # Route page components
-    hooks/        # Custom React hooks
+    components/   # Reusable UI components (SeasonSelector, TeamCard, etc.)
+    pages/        # Route page components (Dashboard, Teams, Contestants, Scoring, Seasons)
+    hooks/        # Custom React hooks (use-season, use-toast)
     lib/          # Utilities and query client
 server/           # Express backend
   routes.ts       # API route definitions
@@ -53,6 +63,16 @@ server/           # Express backend
 shared/           # Shared types and schema
   schema.ts       # Drizzle schema definitions
 ```
+
+## Recent Changes
+- Added Seasons entity for multi-season support
+- All data (teams, contestants, weeks) scoped to seasons via `seasonId`
+- Season dropdown added to all pages (Dashboard, Teams, Contestants, Scoring)
+- Seasons CRUD page at /seasons
+- Existing data migrated to Season 49
+- Changed heading font from Titan One to Slackey (closer to Survivor TV show aesthetic)
+- Fixed contestant edit dialog to properly persist existing data
+- Fixed avatar fallback showing "??" when no name entered
 
 ## External Dependencies
 

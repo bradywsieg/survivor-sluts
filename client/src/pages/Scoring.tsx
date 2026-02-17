@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import SeasonSelector from "@/components/SeasonSelector";
+import { useSeason } from "@/hooks/use-season";
 import { Calendar, Plus, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -15,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface Contestant {
   id: number;
   name: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
   eliminated?: boolean;
 }
 
@@ -44,30 +46,61 @@ export default function Scoring() {
   const [selectedWeekId, setSelectedWeekId] = useState<string>("");
   const [scores, setScores] = useState<Record<number, number>>({});
   const [bonuses, setBonuses] = useState<Record<number, number>>({});
+  const { seasons, selectedSeasonId, setSelectedSeasonId } = useSeason();
 
   const { data: contestants = [], isLoading: contestantsLoading } = useQuery<Contestant[]>({
-    queryKey: ["/api/contestants"],
+    queryKey: ["/api/contestants", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const url = selectedSeasonId ? `/api/contestants?seasonId=${selectedSeasonId}` : `/api/contestants`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId || seasons.length === 0,
   });
 
   const { data: teams = [] } = useQuery<Team[]>({
-    queryKey: ["/api/teams"],
+    queryKey: ["/api/teams", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const url = selectedSeasonId ? `/api/teams?seasonId=${selectedSeasonId}` : `/api/teams`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId || seasons.length === 0,
   });
 
   const { data: weeks = [], isLoading: weeksLoading } = useQuery<Week[]>({
-    queryKey: ["/api/weeks"],
+    queryKey: ["/api/weeks", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const url = selectedSeasonId ? `/api/weeks?seasonId=${selectedSeasonId}` : `/api/weeks`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId || seasons.length === 0,
   });
 
   const { data: weekScores = [] } = useQuery<{ contestantId: number; points: number }[]>({
     queryKey: ["/api/weeks", selectedWeekId, "scores"],
+    queryFn: async () => {
+      const res = await fetch(`/api/weeks/${selectedWeekId}/scores`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
     enabled: !!selectedWeekId,
   });
 
   const { data: weekBonuses = [] } = useQuery<{ teamId: number; bonus: number }[]>({
     queryKey: ["/api/weeks", selectedWeekId, "bonuses"],
+    queryFn: async () => {
+      const res = await fetch(`/api/weeks/${selectedWeekId}/bonuses`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
     enabled: !!selectedWeekId,
   });
 
-  // Initialize scores when week data loads
   useEffect(() => {
     if (weekScores.length > 0) {
       const scoresMap: Record<number, number> = {};
@@ -88,15 +121,16 @@ export default function Scoring() {
     }
   }, [weekBonuses]);
 
-  // Set initial week selection
   useEffect(() => {
-    if (weeks.length > 0 && !selectedWeekId) {
-      setSelectedWeekId(weeks[weeks.length - 1].id.toString());
-    }
-  }, [weeks, selectedWeekId]);
+    const latestWeekId = weeks.length > 0 ? weeks[weeks.length - 1].id.toString() : "";
+    setSelectedWeekId(prev => {
+      if (latestWeekId === prev) return prev;
+      return latestWeekId;
+    });
+  }, [weeks]);
 
   const createWeekMutation = useMutation({
-    mutationFn: (weekNumber: number) => apiRequest("POST", "/api/weeks", { weekNumber }),
+    mutationFn: (weekNumber: number) => apiRequest("POST", "/api/weeks", { weekNumber, seasonId: selectedSeasonId ? parseInt(selectedSeasonId) : undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/weeks"] });
       toast({ title: "Week Added", description: "New week is now available for scoring." });
@@ -179,23 +213,30 @@ export default function Scoring() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
-        <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
           <div className="flex items-center gap-3">
             <Calendar className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl md:text-4xl font-bold font-['Titan_One'] tracking-wide" data-testid="text-page-title">
+            <h1 className="text-3xl md:text-4xl font-bold font-['Slackey'] tracking-wide" data-testid="text-page-title">
               Weekly Scoring
             </h1>
           </div>
-          <Button 
-            onClick={handleAddWeek} 
-            variant="outline"
-            className="gap-2"
-            disabled={createWeekMutation.isPending}
-            data-testid="button-add-week"
-          >
-            <Plus className="h-4 w-4" />
-            Add Week
-          </Button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <SeasonSelector
+              seasons={seasons}
+              selectedSeasonId={selectedSeasonId}
+              onSeasonChange={setSelectedSeasonId}
+            />
+            <Button 
+              onClick={handleAddWeek} 
+              variant="outline"
+              className="gap-2"
+              disabled={createWeekMutation.isPending}
+              data-testid="button-add-week"
+            >
+              <Plus className="h-4 w-4" />
+              Add Week
+            </Button>
+          </div>
         </div>
 
         {weeks.length === 0 ? (
@@ -219,7 +260,7 @@ export default function Scoring() {
         ) : (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
-              <CardTitle className="flex items-center gap-2 text-2xl font-bold font-['Titan_One'] tracking-wide">
+              <CardTitle className="flex items-center gap-2 text-2xl font-bold font-['Slackey'] tracking-wide">
                 <Calendar className="h-6 w-6 text-primary" />
                 Enter Scores
               </CardTitle>
@@ -265,7 +306,7 @@ export default function Scoring() {
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <Avatar className="h-8 w-8">
-                                <AvatarImage src={contestant.imageUrl} alt={contestant.name} />
+                                <AvatarImage src={contestant.imageUrl || undefined} alt={contestant.name} />
                                 <AvatarFallback className="bg-primary/10 text-primary text-xs">
                                   {contestant.name.substring(0, 2).toUpperCase()}
                                 </AvatarFallback>
