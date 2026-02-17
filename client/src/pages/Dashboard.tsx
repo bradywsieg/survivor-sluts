@@ -14,6 +14,8 @@ interface DashboardData {
   weeks: { id: number; weekNumber: number }[];
   weeklyData: Record<string, string | number>[];
   teamNames: string[];
+  teamImages: Record<string, string>;
+  weeklyContestantScores: Record<number, { contestantId: number; points: number }[]>;
 }
 
 export default function Dashboard() {
@@ -69,9 +71,14 @@ export default function Dashboard() {
   const contestants = data?.contestants || [];
   const weeklyData = data?.weeklyData || [];
   const teamNames = data?.teamNames || [];
+  const teamImages = data?.teamImages || {};
+  const weeks = data?.weeks || [];
+  const weeklyContestantScores = data?.weeklyContestantScores || {};
 
   const contestantChartData = contestants.map(c => ({
+    id: c.id,
     name: c.name,
+    imageUrl: c.imageUrl,
     points: c.totalPoints,
     eliminated: c.eliminated,
   }));
@@ -92,7 +99,7 @@ export default function Dashboard() {
         <div className="grid lg:grid-cols-2 gap-8">
           <StandingsTable teams={teams} />
           {weeklyData.length > 0 && teamNames.length > 0 ? (
-            <TeamPointsChart data={weeklyData} teamNames={teamNames} />
+            <TeamPointsChart data={weeklyData} teamNames={teamNames} teamImages={teamImages} />
           ) : (
             <Card>
               <CardContent className="py-16 text-center text-muted-foreground">
@@ -104,7 +111,12 @@ export default function Dashboard() {
         
         <div className="mt-8">
           {contestantChartData.length > 0 ? (
-            <ContestantPerformanceChart data={contestantChartData} />
+            <ContestantPerformanceChart 
+              data={contestantChartData} 
+              weeks={weeks}
+              weeklyContestantScores={weeklyContestantScores}
+              contestants={contestants}
+            />
           ) : (
             <Card>
               <CardContent className="py-16 text-center text-muted-foreground">

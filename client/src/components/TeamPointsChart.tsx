@@ -10,6 +10,7 @@ interface WeeklyData {
 interface TeamPointsChartProps {
   data: WeeklyData[];
   teamNames: string[];
+  teamImages: Record<string, string>;
 }
 
 const CHART_COLORS = [
@@ -20,7 +21,59 @@ const CHART_COLORS = [
   "hsl(160, 55%, 35%)",
 ];
 
-export default function TeamPointsChart({ data, teamNames }: TeamPointsChartProps) {
+function TeamAvatarDot({ cx, cy, index, teamName, teamImages, color, isLast }: any) {
+  if (!isLast || cx == null || cy == null) {
+    return (
+      <circle cx={cx} cy={cy} r={4} fill={color} stroke="none" />
+    );
+  }
+  const imageUrl = teamImages[teamName];
+  const radius = 14;
+  const initials = teamName.substring(0, 2).toUpperCase();
+
+  if (imageUrl) {
+    return (
+      <g>
+        <defs>
+          <clipPath id={`avatar-clip-${index}`}>
+            <circle cx={cx} cy={cy} r={radius} />
+          </clipPath>
+        </defs>
+        <circle cx={cx} cy={cy} r={radius + 1.5} fill={color} />
+        <image
+          href={imageUrl}
+          x={cx - radius}
+          y={cy - radius}
+          width={radius * 2}
+          height={radius * 2}
+          clipPath={`url(#avatar-clip-${index})`}
+          preserveAspectRatio="xMidYMid slice"
+        />
+      </g>
+    );
+  }
+
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={radius} fill={color} />
+      <text
+        x={cx}
+        y={cy}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="white"
+        fontSize={9}
+        fontWeight="bold"
+      >
+        {initials}
+      </text>
+    </g>
+  );
+}
+
+export default function TeamPointsChart({ data, teamNames, teamImages }: TeamPointsChartProps) {
+  const lastIndex = data.length - 1;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
@@ -32,7 +85,7 @@ export default function TeamPointsChart({ data, teamNames }: TeamPointsChartProp
       <CardContent>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+            <LineChart data={data} margin={{ top: 5, right: 40, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis 
                 dataKey="week" 
@@ -51,17 +104,31 @@ export default function TeamPointsChart({ data, teamNames }: TeamPointsChartProp
                 }}
               />
               <Legend />
-              {teamNames.map((name, index) => (
-                <Line
-                  key={name}
-                  type="monotone"
-                  dataKey={name}
-                  stroke={CHART_COLORS[index % CHART_COLORS.length]}
-                  strokeWidth={2}
-                  dot={{ fill: CHART_COLORS[index % CHART_COLORS.length], r: 4 }}
-                  activeDot={{ r: 6 }}
-                />
-              ))}
+              {teamNames.map((name, index) => {
+                const color = CHART_COLORS[index % CHART_COLORS.length];
+                return (
+                  <Line
+                    key={name}
+                    type="monotone"
+                    dataKey={name}
+                    stroke={color}
+                    strokeWidth={2}
+                    dot={(props: any) => (
+                      <TeamAvatarDot
+                        key={props.key}
+                        cx={props.cx}
+                        cy={props.cy}
+                        index={index}
+                        teamName={name}
+                        teamImages={teamImages}
+                        color={color}
+                        isLast={props.index === lastIndex}
+                      />
+                    )}
+                    activeDot={{ r: 6 }}
+                  />
+                );
+              })}
             </LineChart>
           </ResponsiveContainer>
         </div>

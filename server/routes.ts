@@ -430,12 +430,21 @@ export async function registerRoutes(
         return cumulative;
       });
 
+      const weeklyContestantScores: Record<number, { contestantId: number; points: number }[]> = {};
+      weeks.forEach(week => {
+        weeklyContestantScores[week.id] = allScores
+          .filter(s => s.weekId === week.id)
+          .map(s => ({ contestantId: s.contestantId, points: s.points }));
+      });
+
       res.json({
         teams: teamTotals,
         contestants: contestantTotals,
         weeks,
         weeklyData: cumulativeData,
         teamNames: teams.map(t => t.name),
+        teamImages: teams.reduce((acc, t) => { acc[t.name] = t.imageUrl || ""; return acc; }, {} as Record<string, string>),
+        weeklyContestantScores,
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch dashboard data" });
