@@ -1,14 +1,17 @@
 import { 
   seasons, teams, contestants, weeks, contestantScores, teamBonuses,
+  seasonEventSettings, contestantEvents,
   type Season, type InsertSeason,
   type Team, type InsertTeam,
   type Contestant, type InsertContestant,
   type Week, type InsertWeek,
   type ContestantScore, type InsertContestantScore,
-  type TeamBonus, type InsertTeamBonus
+  type TeamBonus, type InsertTeamBonus,
+  type SeasonEventSetting, type InsertSeasonEventSetting,
+  type ContestantEvent, type InsertContestantEvent
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 
 export interface IStorage {
   getSeasons(): Promise<Season[]>;
@@ -46,6 +49,19 @@ export interface IStorage {
   getTeamBonusesByWeek(weekId: number): Promise<TeamBonus[]>;
   getTeamBonusesBySeason(seasonId: number): Promise<TeamBonus[]>;
   upsertTeamBonus(bonus: InsertTeamBonus): Promise<TeamBonus>;
+
+  getSeasonEventSettings(seasonId: number): Promise<SeasonEventSetting[]>;
+  upsertSeasonEventSetting(setting: InsertSeasonEventSetting): Promise<SeasonEventSetting>;
+  updateEventPoints(seasonId: number, eventKey: string, points: number): Promise<SeasonEventSetting | undefined>;
+  seedSeasonEvents(seasonId: number, events: { eventKey: string; eventName: string; points: number }[]): Promise<void>;
+
+  getContestantEvents(seasonId: number, weekId: number): Promise<ContestantEvent[]>;
+  getContestantEventsBySeason(seasonId: number): Promise<ContestantEvent[]>;
+  addContestantEvent(event: InsertContestantEvent): Promise<ContestantEvent>;
+  deleteContestantEvent(id: number): Promise<boolean>;
+
+  recalcScoresForWeek(seasonId: number, weekId: number): Promise<void>;
+  recalcScoresForSeason(seasonId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -133,6 +149,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteContestant(id: number): Promise<boolean> {
     await db.delete(contestantScores).where(eq(contestantScores.contestantId, id));
+    await db.delete(contestantEvents).where(eq(contestantEvents.contestantId, id));
     const result = await db.delete(contestants).where(eq(contestants.id, id));
     return (result.rowCount ?? 0) > 0;
   }
@@ -166,6 +183,7 @@ export class DatabaseStorage implements IStorage {
   async deleteWeek(id: number): Promise<boolean> {
     await db.delete(contestantScores).where(eq(contestantScores.weekId, id));
     await db.delete(teamBonuses).where(eq(teamBonuses.weekId, id));
+    await db.delete(contestantEvents).where(eq(contestantEvents.weekId, id));
     const result = await db.delete(weeks).where(eq(weeks.id, id));
     return (result.rowCount ?? 0) > 0;
   }
@@ -182,8 +200,7 @@ export class DatabaseStorage implements IStorage {
     const seasonWeeks = await this.getWeeks(seasonId);
     const weekIds = seasonWeeks.map(w => w.id);
     if (weekIds.length === 0) return [];
-    const allScores = await db.select().from(contestantScores);
-    return allScores.filter(s => weekIds.includes(s.weekId));
+    return await db.select().from(contestantScores).where(inArray(contestantScores.weekId, weekIds));
   }
 
   async upsertContestantScore(score: InsertContestantScore): Promise<ContestantScore> {
@@ -217,8 +234,7 @@ export class DatabaseStorage implements IStorage {
     const seasonWeeks = await this.getWeeks(seasonId);
     const weekIds = seasonWeeks.map(w => w.id);
     if (weekIds.length === 0) return [];
-    const allBonuses = await db.select().from(teamBonuses);
-    return allBonuses.filter(b => weekIds.includes(b.weekId));
+    return await db.select().from(teamBonuses).where(inArray(teamBonuses.weekId, weekIds));
   }
 
   async upsertTeamBonus(bonus: InsertTeamBonus): Promise<TeamBonus> {
@@ -237,6 +253,113 @@ export class DatabaseStorage implements IStorage {
     } else {
       const [newBonus] = await db.insert(teamBonuses).values(bonus).returning();
       return newBonus;
+    }
+  }
+
+  async getSeasonEventSettings(seasonId: number): Promise<SeasonEventSetting[]> {
+    return await db.select().from(seasonEventSettings)
+      .where(eq(seasonEventSettings.seasonId, seasonId))
+      .orderBy(seasonEventSettings.id);
+  }
+
+  async upsertSeasonEventSetting(setting: InsertSeasonEventSetting): Promise<SeasonEventSetting> {
+    const [existing] = await db.select().from(seasonEventSettings)
+      .where(and(
+        eq(seasonEventSettings.seasonId, setting.seasonId),
+        eq(seasonEventSettings.eventKey, setting.eventKey)
+      ));
+    
+    if (existing) {
+      const [updated] = await db.update(seasonEventSettings)
+        .set({ points: setting.points, eventName: setting.eventName })
+        .where(eq(seasonEventSettings.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [newSetting] = await db.insert(seasonEventSettings).values(setting).returning();
+      return newSetting;
+    }
+  }
+
+  async updateEventPoints(seasonId: number, eventKey: string, points: number): Promise<SeasonEventSetting | undefined> {
+    const [updated] = await db.update(seasonEventSettings)
+      .set({ points })
+      .where(and(
+        eq(seasonEventSettings.seasonId, seasonId),
+        eq(seasonEventSettings.eventKey, eventKey)
+      ))
+      .returning();
+    return updated;
+  }
+
+  async seedSeasonEvents(seasonId: number, events: { eventKey: string; eventName: string; points: number }[]): Promise<void> {
+    const existing = await this.getSeasonEventSettings(seasonId);
+    if (existing.length > 0) return;
+
+    const values = events.map(e => ({
+      seasonId,
+      eventKey: e.eventKey,
+      eventName: e.eventName,
+      points: e.points,
+    }));
+
+    if (values.length > 0) {
+      await db.insert(seasonEventSettings).values(values);
+    }
+  }
+
+  async getContestantEvents(seasonId: number, weekId: number): Promise<ContestantEvent[]> {
+    return await db.select().from(contestantEvents)
+      .where(and(
+        eq(contestantEvents.seasonId, seasonId),
+        eq(contestantEvents.weekId, weekId)
+      ));
+  }
+
+  async getContestantEventsBySeason(seasonId: number): Promise<ContestantEvent[]> {
+    return await db.select().from(contestantEvents)
+      .where(eq(contestantEvents.seasonId, seasonId));
+  }
+
+  async addContestantEvent(event: InsertContestantEvent): Promise<ContestantEvent> {
+    const [newEvent] = await db.insert(contestantEvents).values(event).returning();
+    return newEvent;
+  }
+
+  async deleteContestantEvent(id: number): Promise<boolean> {
+    const result = await db.delete(contestantEvents).where(eq(contestantEvents.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async recalcScoresForWeek(seasonId: number, weekId: number): Promise<void> {
+    const events = await this.getContestantEvents(seasonId, weekId);
+    const settings = await this.getSeasonEventSettings(seasonId);
+    const settingsMap = new Map(settings.map(s => [s.eventKey, s.points]));
+
+    const contestants = await this.getContestants(seasonId);
+    
+    for (const contestant of contestants) {
+      const contestantEvts = events.filter(e => e.contestantId === contestant.id);
+      let total = 0;
+      for (const evt of contestantEvts) {
+        if (evt.pointsOverride !== null) {
+          total += evt.pointsOverride;
+        } else if (evt.eventKey) {
+          total += settingsMap.get(evt.eventKey) ?? 0;
+        }
+      }
+      await this.upsertContestantScore({
+        contestantId: contestant.id,
+        weekId,
+        points: total,
+      });
+    }
+  }
+
+  async recalcScoresForSeason(seasonId: number): Promise<void> {
+    const seasonWeeks = await this.getWeeks(seasonId);
+    for (const week of seasonWeeks) {
+      await this.recalcScoresForWeek(seasonId, week.id);
     }
   }
 }

@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -13,6 +13,7 @@ export const seasonsRelations = relations(seasons, ({ many }) => ({
   teams: many(teams),
   contestants: many(contestants),
   weeks: many(weeks),
+  eventSettings: many(seasonEventSettings),
 }));
 
 export const insertSeasonSchema = createInsertSchema(seasons).omit({ id: true });
@@ -52,6 +53,7 @@ export const contestantsRelations = relations(contestants, ({ one, many }) => ({
   }),
   season: one(seasons, { fields: [contestants.seasonId], references: [seasons.id] }),
   scores: many(contestantScores),
+  events: many(contestantEvents),
 }));
 
 export const insertContestantSchema = createInsertSchema(contestants).omit({ id: true });
@@ -68,6 +70,7 @@ export const weeksRelations = relations(weeks, ({ one, many }) => ({
   season: one(seasons, { fields: [weeks.seasonId], references: [seasons.id] }),
   contestantScores: many(contestantScores),
   teamBonuses: many(teamBonuses),
+  contestantEvents: many(contestantEvents),
 }));
 
 export const insertWeekSchema = createInsertSchema(weeks).omit({ id: true });
@@ -117,3 +120,53 @@ export const teamBonusesRelations = relations(teamBonuses, ({ one }) => ({
 export const insertTeamBonusSchema = createInsertSchema(teamBonuses).omit({ id: true });
 export type InsertTeamBonus = z.infer<typeof insertTeamBonusSchema>;
 export type TeamBonus = typeof teamBonuses.$inferSelect;
+
+export const seasonEventSettings = pgTable("season_event_settings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  seasonId: integer("season_id").references(() => seasons.id).notNull(),
+  eventKey: text("event_key").notNull(),
+  eventName: text("event_name").notNull(),
+  points: integer("points").default(0).notNull(),
+}, (table) => [
+  unique().on(table.seasonId, table.eventKey),
+]);
+
+export const seasonEventSettingsRelations = relations(seasonEventSettings, ({ one }) => ({
+  season: one(seasons, {
+    fields: [seasonEventSettings.seasonId],
+    references: [seasons.id],
+  }),
+}));
+
+export const insertSeasonEventSettingSchema = createInsertSchema(seasonEventSettings).omit({ id: true });
+export type InsertSeasonEventSetting = z.infer<typeof insertSeasonEventSettingSchema>;
+export type SeasonEventSetting = typeof seasonEventSettings.$inferSelect;
+
+export const contestantEvents = pgTable("contestant_events", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  seasonId: integer("season_id").references(() => seasons.id).notNull(),
+  weekId: integer("week_id").references(() => weeks.id).notNull(),
+  contestantId: integer("contestant_id").references(() => contestants.id).notNull(),
+  eventKey: text("event_key"),
+  eventName: text("event_name").notNull(),
+  pointsOverride: integer("points_override"),
+});
+
+export const contestantEventsRelations = relations(contestantEvents, ({ one }) => ({
+  season: one(seasons, {
+    fields: [contestantEvents.seasonId],
+    references: [seasons.id],
+  }),
+  week: one(weeks, {
+    fields: [contestantEvents.weekId],
+    references: [weeks.id],
+  }),
+  contestant: one(contestants, {
+    fields: [contestantEvents.contestantId],
+    references: [contestants.id],
+  }),
+}));
+
+export const insertContestantEventSchema = createInsertSchema(contestantEvents).omit({ id: true });
+export type InsertContestantEvent = z.infer<typeof insertContestantEventSchema>;
+export type ContestantEvent = typeof contestantEvents.$inferSelect;

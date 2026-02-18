@@ -1,0 +1,248 @@
+You are updating an existing React + Vite app with an existing SQL database. Current tables: contestant_scores, team_bonuses, contestants, seasons, teams, weeks.
+
+Implement event-based scoring with per-season scoring rules, and a PIN-protected Admin area.
+
+High-level changes
+
+Rename nav “Scoring” to Admin and move the existing weekly scoring page under Admin.
+
+Protect Admin with a simple 4-digit PIN: 1911 (no user roles).
+
+Add a public Rules page that displays the scoring rubric (read-only).
+
+Replace manual numeric scoring entry with event assignment (multi-select + custom events).
+
+Add “Point Value Settings” section in Admin to edit the season’s rubric.
+
+Rubric values are per season. Updating an event value should retroactively change all weeks for that season, but not affect other seasons.
+
+A) Database Changes (minimal + clean)
+A1) Create new table: season_event_settings
+
+Purpose: scoring rubric per season
+
+Columns:
+
+id (PK)
+
+season_id (FK -> seasons.id, indexed)
+
+event_key (string, indexed)
+
+event_name (string)
+
+points (integer)
+
+created_at, updated_at
+
+Constraints:
+
+Unique (season_id, event_key)
+
+A2) Create new table: contestant_events
+
+Purpose: assigned events per contestant per week
+
+Columns:
+
+id (PK)
+
+season_id (FK -> seasons.id, indexed)
+
+week_id (FK -> weeks.id, indexed)
+
+contestant_id (FK -> contestants.id, indexed)
+
+event_key (nullable string) // null for custom events
+
+event_name (string)
+
+points_override (nullable integer) // used for custom events; if null use season_event_settings.points
+
+created_at
+
+No uniqueness constraints (events repeatable).
+
+A3) Keep existing tables
+
+Do NOT delete/replace contestant_scores or team_bonuses yet.
+We will update how they are calculated.
+
+B) Seed default rubric from uploaded CSV
+
+A file exists in the repo: PointValues_Survivor.csv with columns Event, Points.
+
+Implement a “seed if missing” process:
+
+When a season is selected (or on season creation), if there are 0 rows in season_event_settings for that season:
+
+Read PointValues_Survivor.csv
+
+Insert all rows into season_event_settings for that season
+
+Generate event_key as a stable slug from event_name (lowercase, hyphenate, remove special chars). Ensure uniqueness.
+
+This default rubric is used for every season unless edited later.
+
+C) Scoring calculation rules (no snapshots)
+
+Contestant weekly points for a week:
+
+Sum of assigned events in contestant_events for that contestant/week/season
+
+Each event points:
+
+if points_override is not null → use it
+
+else look up points in season_event_settings using (season_id + event_key)
+
+Because we are not snapshotting, rule edits must retroactively change past weeks in the same season.
+
+C1) Updating contestant_scores
+
+The app currently has a contestant_scores table that the UI likely uses.
+
+Implement recalculation when:
+
+events are added/removed
+
+point values are changed for a season
+
+Simplest approach:
+
+On any change, recalculate totals for the affected season_id + week_id
+
+Write totals into contestant_scores for that week/contestant (update existing or insert if missing)
+
+Also update team_bonuses if needed (or leave as-is if bonuses remain manual)
+
+If it’s easy, also compute team totals by summing contestant_scores for team members (depending on your schema).
+
+D) API endpoints (or DB access layer)
+
+Follow existing backend patterns in this app (use the same approach it currently uses to read/write the DB).
+
+Create endpoints for:
+
+GET season rubric: /api/seasons/:seasonId/events
+
+PUT update rubric points: /api/seasons/:seasonId/events/:eventKey
+
+GET contestant events for week: /api/seasons/:seasonId/weeks/:weekId/contestant-events
+
+POST add contestant events (supports multiple eventKeys)
+
+POST add custom event (name + points_override)
+
+DELETE remove a contestant_event by id
+
+POST recalc totals for (seasonId, weekId)
+
+Add simple Admin PIN guard to all write endpoints for scoring/rules.
+
+E) PIN protection (Admin)
+
+PIN is 1911.
+Implement:
+
+Admin routes under /admin require PIN
+
+If not authed, show a PIN screen
+
+On success, store commissioner_authed=true in localStorage
+
+Protect server-side write endpoints too:
+
+require header X-Commissioner-Pin or cookie set by PIN entry flow
+
+simplest: store commissioner_authed in localStorage and send pin header with requests from Admin pages
+
+validate pin server-side against hardcoded 1911 (or env var)
+
+F) UI changes
+F1) Rename “Scoring” → “Admin”
+
+Keep same nav styling.
+
+F2) Create “Rules” page (public)
+
+Route: /rules
+
+Season selector (same pattern as elsewhere)
+
+Read-only table: Event | Points
+
+Pull from season_event_settings for selected season
+
+If empty, trigger seed.
+
+F3) Admin page = updated weekly scoring
+
+Route: /admin
+Include:
+
+Enter Results section (event assignment)
+
+Point Value Settings section (edit rubric values)
+
+Enter Results UI (replace manual points entry)
+
+For each contestant row:
+
+If contestant is eliminated, style row as disabled (reduced opacity, grey background)
+
+Disable “Add Event” button for eliminated contestants
+
+Show existing assigned event chips for that contestant/week
+
+each chip shows: event_name + points (computed)
+
+each chip has an “x” to remove (DELETE contestant_event). Removal can remain enabled even if eliminated (optional).
+
+“Add Event” opens modal/popup:
+
+searchable multi-select list of all rubric events for the season
+
+confirm adds multiple events as assignments
+
+include “Custom Event” button:
+
+prompts for event name + integer points
+
+creates a custom contestant_event with points_override and null event_key
+
+All events repeatable; no max constraints.
+
+Point Value Settings UI
+
+Table listing rubric events for the selected season
+
+Inline editable points field
+
+Save on blur or Save button
+
+On update, run recalc for all weeks in that season OR at minimum recalc for weeks that exist (weeks table) — keep it simple but correct.
+
+G) Performance / simplicity notes
+
+This app is small. Prefer correctness + simple code over optimization.
+
+Recalculate per week rather than global where possible.
+
+Only seed rubric once per season.
+
+H) Done when
+
+Admin PIN works (1911)
+
+Rules page displays rubric
+
+Admin Enter Results adds/removes events and updates totals
+
+Point value edits retroactively update scores for that season
+
+Eliminated contestants are disabled for adding events
+
+UI matches existing design patterns
+
+Proceed with the simplest implementation consistent with the current project architecture.

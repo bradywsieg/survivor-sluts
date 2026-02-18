@@ -2,7 +2,7 @@
 
 ## Overview
 
-A fantasy sports-style web application for tracking Survivor TV show leagues across multiple seasons. Users manage teams, contestants, and weekly scoring to track standings and performance. The app features a tropical/adventure theme inspired by the Survivor TV show aesthetic. No authentication required - all users can edit data.
+A fantasy sports-style web application for tracking Survivor TV show leagues across multiple seasons. Users manage teams, contestants, and weekly scoring to track standings and performance. The app features a tropical/adventure theme inspired by the Survivor TV show aesthetic. Branding: "Survivor Sluts". Admin area is PIN-protected (PIN: 1911). Configured as a Progressive Web App (PWA) for home screen installation.
 
 ## User Preferences
 
@@ -23,23 +23,34 @@ Preferred communication style: Simple, everyday language.
 - **API Pattern**: RESTful JSON API under `/api/*` routes
 - **Database ORM**: Drizzle ORM with PostgreSQL dialect
 - **Schema Validation**: Zod with drizzle-zod for type-safe validation
+- **Admin Protection**: PIN-based authentication via `X-Commissioner-Pin` header, validated server-side
 
 ### Data Model
-The application manages six core entities:
+The application manages eight core entities:
 1. **Seasons** - Seasons of the Survivor show (e.g., Season 49, Season 50)
 2. **Teams** - Fantasy league teams with name, image, and season association
 3. **Contestants** - Survivor show contestants, assigned to teams and seasons, can be eliminated
 4. **Weeks** - Episode/week tracking for scoring, tied to a season
-5. **Contestant Scores** - Points earned by contestants per week
+5. **Contestant Scores** - Computed points earned by contestants per week (recalculated from events)
 6. **Team Bonuses** - Additional team-level bonus points per week
+7. **Season Event Settings** - Scoring rubric per season (event name, key, point value). Seeded from CSV on first access.
+8. **Contestant Events** - Individual event assignments per contestant per week. Custom events use pointsOverride; standard events look up points from season_event_settings.
 
 All teams, contestants, and weeks are scoped to a season via `seasonId` foreign key.
+
+### Scoring System
+- Event-based scoring: admins assign events to contestants per week using multi-select or custom events
+- Points are computed from season_event_settings (rubric) unless overridden by pointsOverride
+- Editing rubric point values retroactively recalculates all scores for that season
+- contestant_scores table stores computed totals per contestant per week
+- Default rubric seeded from `server/data/PointValues_Survivor.csv` (42 events)
 
 ### Pages
 - `/` - Dashboard with hero banner, standings table, charts, season dropdown
 - `/teams` - Teams CRUD management with season filtering
 - `/contestants` - Contestants CRUD management with season filtering
-- `/scoring` - Weekly scoring entry with season and week selectors
+- `/rules` - Public read-only scoring rubric display with season selector
+- `/admin` - PIN-protected admin area with Enter Results (event assignment) and Point Value Settings tabs
 - `/seasons` - Seasons CRUD management
 
 ### Design System
@@ -52,33 +63,31 @@ All teams, contestants, and weeks are scoped to a season via `seasonId` foreign 
 ```
 client/           # React frontend
   src/
-    components/   # Reusable UI components (SeasonSelector, TeamCard, etc.)
-    pages/        # Route page components (Dashboard, Teams, Contestants, Scoring, Seasons)
+    components/   # Reusable UI components (SeasonSelector, TeamCard, PinGate, etc.)
+    pages/        # Route page components (Dashboard, Teams, Contestants, Admin, Rules, Seasons)
     hooks/        # Custom React hooks (use-season, use-toast)
-    lib/          # Utilities and query client
+    lib/          # Utilities, query client, adminApi helper
+  public/         # Static assets (PWA manifest, icons, service worker)
 server/           # Express backend
-  routes.ts       # API route definitions
-  storage.ts      # Database access layer
+  routes.ts       # API route definitions with PIN middleware
+  storage.ts      # Database access layer with event/recalc methods
   db.ts           # Database connection
+  data/           # CSV data files for rubric seeding
 shared/           # Shared types and schema
-  schema.ts       # Drizzle schema definitions
+  schema.ts       # Drizzle schema definitions (8 tables)
 ```
 
 ## Recent Changes
-- Enhanced ContestantPerformanceChart with Cumulative/Weekly toggle views, week dropdown filter, dynamic height for large casts, contestant avatars on Y-axis, and point labels on bars
-- Updated TeamPointsChart to show team avatar images at line endpoints (falls back to initials circle)
-- Dashboard API now returns teamImages and weeklyContestantScores for chart enhancements
-- Hero banner subtitle updated to "Outwit. Outplay. Outdraft your friends."
-- TeamCard shows contestant profile pictures in roster pills
-- Team editor supports image URL with live preview
-- Added Seasons entity for multi-season support
-- All data (teams, contestants, weeks) scoped to seasons via `seasonId`
-- Season dropdown added to all pages (Dashboard, Teams, Contestants, Scoring)
-- Seasons CRUD page at /seasons
-- Existing data migrated to Season 49
-- Changed heading font from Titan One to Slackey (closer to Survivor TV show aesthetic)
-- Fixed contestant edit dialog to properly persist existing data
-- Fixed avatar fallback showing "??" when no name entered
+- Implemented event-based scoring system replacing manual numeric entry
+- Added season_event_settings and contestant_events database tables
+- Added PIN-protected Admin area (PIN: 1911) with event assignment UI and point value settings
+- Added public Rules page showing scoring rubric per season
+- Renamed "Scoring" nav item to "Admin", added "Rules" nav item
+- Default scoring rubric seeded from CSV (42 Survivor events with point values)
+- Rubric edits retroactively recalculate all scores for the season
+- Eliminated contestants are disabled for adding new events
+- Admin API routes protected with X-Commissioner-Pin header validation
+- PWA configured with custom app icon, manifest, and service worker
 
 ## External Dependencies
 

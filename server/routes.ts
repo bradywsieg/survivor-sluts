@@ -1,13 +1,89 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTeamSchema, insertContestantSchema, insertWeekSchema, insertSeasonSchema } from "@shared/schema";
 import { z } from "zod";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const ADMIN_PIN = "1911";
+
+function requirePin(req: Request, res: Response, next: NextFunction) {
+  const pin = req.headers["x-commissioner-pin"] as string;
+  if (pin === ADMIN_PIN) {
+    return next();
+  }
+  return res.status(401).json({ error: "Invalid PIN" });
+}
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim();
+}
+
+function parseCSVEvents(): { eventKey: string; eventName: string; points: number }[] {
+  const csvPath = path.resolve(__dirname, "data", "PointValues_Survivor.csv");
+  if (!fs.existsSync(csvPath)) return [];
+  const raw = fs.readFileSync(csvPath, "utf-8");
+  const lines = raw.split("\n").slice(1);
+  const events: { eventKey: string; eventName: string; points: number }[] = [];
+  const usedKeys = new Set<string>();
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const match = trimmed.match(/^"?([^",]+(?:,[^"]*)?)"?\s*,\s*(-?\d+)/);
+    if (!match) {
+      const parts = trimmed.split(",");
+      if (parts.length >= 2) {
+        const eventName = parts[0].replace(/^"|"$/g, "").trim();
+        const points = parseInt(parts[1]);
+        if (eventName && !isNaN(points)) {
+          let key = slugify(eventName);
+          if (!key) continue;
+          while (usedKeys.has(key)) { key += "-2"; }
+          usedKeys.add(key);
+          events.push({ eventKey: key, eventName, points });
+        }
+      }
+      continue;
+    }
+    const eventName = match[1].replace(/^"|"$/g, "").trim();
+    const points = parseInt(match[2]);
+    if (eventName && !isNaN(points)) {
+      let key = slugify(eventName);
+      if (!key) continue;
+      while (usedKeys.has(key)) { key += "-2"; }
+      usedKeys.add(key);
+      events.push({ eventKey: key, eventName, points });
+    }
+  }
+  return events;
+}
+
+const defaultEvents = parseCSVEvents();
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // PIN validation endpoint
+  app.post("/api/admin/verify-pin", (req, res) => {
+    const { pin } = req.body;
+    if (pin === ADMIN_PIN) {
+      return res.json({ success: true });
+    }
+    return res.status(401).json({ error: "Invalid PIN" });
+  });
+
   // Seasons API
   app.get("/api/seasons", async (req, res) => {
     try {
@@ -44,6 +120,9 @@ export async function registerRoutes(
     try {
       const parsed = insertSeasonSchema.parse(req.body);
       const season = await storage.createSeason(parsed);
+      if (defaultEvents.length > 0) {
+        await storage.seedSeasonEvents(season.id, defaultEvents);
+      }
       res.status(201).json(season);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -238,7 +317,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/weeks", async (req, res) => {
+  app.post("/api/weeks", requirePin, async (req, res) => {
     try {
       const parsed = insertWeekSchema.parse(req.body);
       const week = await storage.createWeek(parsed);
@@ -251,7 +330,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/weeks/:id", async (req, res) => {
+  app.delete("/api/weeks/:id", requirePin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteWeek(id);
@@ -264,7 +343,7 @@ export async function registerRoutes(
     }
   });
 
-  // Scores API
+  // Scores API (keep existing read endpoints for dashboard)
   app.get("/api/scores", async (req, res) => {
     try {
       const seasonId = req.query.seasonId ? parseInt(req.query.seasonId as string) : undefined;
@@ -289,7 +368,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/scores", async (req, res) => {
+  app.post("/api/scores", requirePin, async (req, res) => {
     try {
       const { contestantId, weekId, points } = req.body;
       const score = await storage.upsertContestantScore({ contestantId, weekId, points });
@@ -299,7 +378,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/weeks/:weekId/scores", async (req, res) => {
+  app.post("/api/weeks/:weekId/scores", requirePin, async (req, res) => {
     try {
       const weekId = parseInt(req.params.weekId);
       const { scores, bonuses } = req.body as { 
@@ -351,6 +430,148 @@ export async function registerRoutes(
       res.json(bonuses);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch bonuses" });
+    }
+  });
+
+  app.post("/api/weeks/:weekId/bonuses", requirePin, async (req, res) => {
+    try {
+      const weekId = parseInt(req.params.weekId);
+      const { teamId, bonus } = req.body;
+      const saved = await storage.upsertTeamBonus({ teamId, weekId, bonus });
+      res.json(saved);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save bonus" });
+    }
+  });
+
+  // Season Event Settings API (rubric)
+  app.get("/api/seasons/:seasonId/events", async (req, res) => {
+    try {
+      const seasonId = parseInt(req.params.seasonId);
+      let events = await storage.getSeasonEventSettings(seasonId);
+      if (events.length === 0 && defaultEvents.length > 0) {
+        await storage.seedSeasonEvents(seasonId, defaultEvents);
+        events = await storage.getSeasonEventSettings(seasonId);
+      }
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch event settings" });
+    }
+  });
+
+  app.put("/api/seasons/:seasonId/events/:eventKey", requirePin, async (req, res) => {
+    try {
+      const seasonId = parseInt(req.params.seasonId);
+      const eventKey = req.params.eventKey;
+      const { points } = req.body;
+      const updated = await storage.updateEventPoints(seasonId, eventKey, points);
+      if (!updated) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      await storage.recalcScoresForSeason(seasonId);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update event" });
+    }
+  });
+
+  app.put("/api/seasons/:seasonId/events", requirePin, async (req, res) => {
+    try {
+      const seasonId = parseInt(req.params.seasonId);
+      const { events } = req.body as { events: { eventKey: string; points: number }[] };
+      for (const evt of events) {
+        await storage.updateEventPoints(seasonId, evt.eventKey, evt.points);
+      }
+      await storage.recalcScoresForSeason(seasonId);
+      const updated = await storage.getSeasonEventSettings(seasonId);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update events" });
+    }
+  });
+
+  // Contestant Events API
+  app.get("/api/seasons/:seasonId/weeks/:weekId/contestant-events", async (req, res) => {
+    try {
+      const seasonId = parseInt(req.params.seasonId);
+      const weekId = parseInt(req.params.weekId);
+      const events = await storage.getContestantEvents(seasonId, weekId);
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch contestant events" });
+    }
+  });
+
+  app.post("/api/seasons/:seasonId/weeks/:weekId/contestant-events", requirePin, async (req, res) => {
+    try {
+      const seasonId = parseInt(req.params.seasonId);
+      const weekId = parseInt(req.params.weekId);
+      const { contestantId, eventKeys, customEvent } = req.body as {
+        contestantId: number;
+        eventKeys?: string[];
+        customEvent?: { eventName: string; points: number };
+      };
+
+      const results = [];
+
+      if (eventKeys && eventKeys.length > 0) {
+        const settings = await storage.getSeasonEventSettings(seasonId);
+        for (const key of eventKeys) {
+          const setting = settings.find(s => s.eventKey === key);
+          if (setting) {
+            const evt = await storage.addContestantEvent({
+              seasonId,
+              weekId,
+              contestantId,
+              eventKey: key,
+              eventName: setting.eventName,
+              pointsOverride: null,
+            });
+            results.push(evt);
+          }
+        }
+      }
+
+      if (customEvent) {
+        const evt = await storage.addContestantEvent({
+          seasonId,
+          weekId,
+          contestantId,
+          eventKey: null,
+          eventName: customEvent.eventName,
+          pointsOverride: customEvent.points,
+        });
+        results.push(evt);
+      }
+
+      await storage.recalcScoresForWeek(seasonId, weekId);
+      res.status(201).json(results);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add contestant events" });
+    }
+  });
+
+  app.delete("/api/contestant-events/:id", requirePin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteContestantEvent(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete event" });
+    }
+  });
+
+  app.post("/api/seasons/:seasonId/weeks/:weekId/recalc", requirePin, async (req, res) => {
+    try {
+      const seasonId = parseInt(req.params.seasonId);
+      const weekId = parseInt(req.params.weekId);
+      await storage.recalcScoresForWeek(seasonId, weekId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to recalculate" });
     }
   });
 
