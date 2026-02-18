@@ -1,4 +1,4 @@
-const CACHE_NAME = 'survivor-sluts-v1';
+const CACHE_NAME = 'survivor-sluts-v2';
 const STATIC_ASSETS = [
   '/',
   '/app-icon-192.png',
