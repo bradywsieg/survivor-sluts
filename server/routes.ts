@@ -796,5 +796,76 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/seed-season50-tribes", requirePin, async (_req: Request, res: Response) => {
+    try {
+      const seasons = await storage.getSeasons();
+      const season50 = seasons.find(s => s.number === 50);
+      if (!season50) return res.status(404).json({ error: "Season 50 not found" });
+
+      const existingTribes = await storage.getTribes(season50.id);
+      if (existingTribes.length > 0) return res.json({ message: "Tribes already seeded", tribes: existingTribes });
+
+      const vatu = await storage.createTribe({ name: "Vatu", color: "#7B2D8E", seasonId: season50.id });
+      const cila = await storage.createTribe({ name: "Cila", color: "#E87722", seasonId: season50.id });
+      const kalo = await storage.createTribe({ name: "Kalo", color: "#00A79D", seasonId: season50.id });
+
+      const contestants = await storage.getContestants(season50.id);
+
+      const tribeMap: Record<string, number> = {
+        "Colby Donaldson": vatu.id, "Genevieve Mushaluk": vatu.id, "Rizo Velovic": vatu.id,
+        "Angelina Keeley": vatu.id, "Q Burdette": vatu.id, "Stephenie LaGrossa Kendrick": vatu.id,
+        "Kyle Fraser": vatu.id, "Aubry Bracco": vatu.id,
+        "Joe Hunter": cila.id, "Savannah Louie": cila.id, "Christian Hubicki": cila.id,
+        "Cirie Fields": cila.id, "Ozzy Lusth": cila.id, "Emily Flippen": cila.id,
+        "Rick Devens": cila.id, "Jenna Lewis-Dougherty": cila.id,
+        "Jonathan Young": kalo.id, "Dee Valladares": kalo.id, "Mike White": kalo.id,
+        "Kamilla Karthigesu": kalo.id, "Charlie Davis": kalo.id, "Tiffany Ervin": kalo.id,
+        'Benjamin "Coach" Wade': kalo.id, "Chrissy Hofbeck": kalo.id,
+      };
+
+      const bioMap: Record<string, string> = {
+        "Colby Donaldson": "The original Survivor heartthrob from Season 2: The Australian Outback. A three-time player known for his cowboy charm and challenge prowess.",
+        "Genevieve Mushaluk": "Strategic powerhouse from Season 47 who played a cutthroat game. Known for her sharp social reads and aggressive gameplay.",
+        "Rizo Velovic": "4th place finisher from Season 49 who lost at fire-making. A physical and social threat who narrowly missed the finals.",
+        "Angelina Keeley": "Memorable player from Season 37: David vs. Goliath. Famous for negotiating for rice and her bold, entertaining gameplay.",
+        "Q Burdette": "Big personality from Season 46 known for his physical dominance and unpredictable strategic moves.",
+        "Stephenie LaGrossa Kendrick": "Legendary three-time player from Palau and Guatemala. Known as one of the toughest competitors in Survivor history.",
+        "Kyle Fraser": "Season 48 winner who dominated the new era. A strong social and strategic player who controlled the game.",
+        "Aubry Bracco": "Three-time player from Kaoh Rong, Game Changers, and Edge of Extinction. Known for her cerebral gameplay and emotional journey.",
+        "Joe Hunter": "Physical competitor from Season 42. Known for his strength in challenges and genuine personality.",
+        "Savannah Louie": "Season 49 winner who played a dominant strategic and social game. A new-era champion returning to prove herself again.",
+        "Christian Hubicki": "Fan-favorite from Season 37: David vs. Goliath. A robotics engineer known for his charm, wit, and puzzle-solving skills.",
+        "Cirie Fields": "Four-time player and one of the most beloved contestants ever. Known for her masterful social game and strategic genius.",
+        "Ozzy Lusth": "Four-time player legendary for his challenge dominance, especially in water and endurance challenges.",
+        "Emily Flippen": "Breakout star from Season 45 who went from early target to late-game power player. Known for her strategic evolution.",
+        "Rick Devens": "Edge of Extinction standout who came back from the edge to nearly win it all. A news anchor known for his idol finds.",
+        "Jenna Lewis-Dougherty": "Original Season 1 castaway who returned for All-Stars. One of the OG Survivor players bringing old-school gameplay.",
+        "Jonathan Young": "Physical beast from Season 42 known for his incredible strength in challenges and gentle personality.",
+        "Dee Valladares": "Season 45 winner who played a strategic masterclass. Known for her calculated moves and social awareness.",
+        "Mike White": "Emmy-winning creator of The White Lotus who was runner-up on Season 37. Brings Hollywood creativity to the island.",
+        "Kamilla Karthigesu": "Contestant from Season 48 known for her social connections and strategic awareness in the new era.",
+        "Charlie Davis": "Runner-up from Season 46 who played a strong strategic game. Known for his close alliance work and jury management.",
+        "Tiffany Ervin": "Memorable player from Season 46 known for her bold moves and entertaining confessionals.",
+        'Benjamin "Coach" Wade': "Three-time player and self-proclaimed Dragon Slayer. One of Survivor's most iconic and entertaining characters.",
+        "Chrissy Hofbeck": "Strategic player from Season 35: Heroes vs. Healers vs. Hustlers. An actuary known for her analytical approach to the game.",
+      };
+
+      for (const c of contestants) {
+        const tribeId = tribeMap[c.name];
+        const bio = bioMap[c.name];
+        if (tribeId || bio) {
+          await storage.updateContestant(c.id, {
+            ...(tribeId ? { tribeId } : {}),
+            ...(bio ? { bio } : {}),
+          });
+        }
+      }
+
+      res.json({ message: "Season 50 tribes and bios seeded successfully", tribes: [vatu, cila, kalo] });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to seed data" });
+    }
+  });
+
   return httpServer;
 }
