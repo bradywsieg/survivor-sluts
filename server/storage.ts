@@ -1,6 +1,6 @@
 import { 
   seasons, teams, contestants, weeks, contestantScores, teamBonuses,
-  seasonEventSettings, contestantEvents,
+  seasonEventSettings, contestantEvents, tribes,
   type Season, type InsertSeason,
   type Team, type InsertTeam,
   type Contestant, type InsertContestant,
@@ -8,7 +8,8 @@ import {
   type ContestantScore, type InsertContestantScore,
   type TeamBonus, type InsertTeamBonus,
   type SeasonEventSetting, type InsertSeasonEventSetting,
-  type ContestantEvent, type InsertContestantEvent
+  type ContestantEvent, type InsertContestantEvent,
+  type Tribe, type InsertTribe
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, inArray } from "drizzle-orm";
@@ -20,6 +21,12 @@ export interface IStorage {
   createSeason(season: InsertSeason): Promise<Season>;
   updateSeason(id: number, season: Partial<InsertSeason>): Promise<Season | undefined>;
   deleteSeason(id: number): Promise<boolean>;
+
+  getTribes(seasonId?: number): Promise<Tribe[]>;
+  getTribe(id: number): Promise<Tribe | undefined>;
+  createTribe(tribe: InsertTribe): Promise<Tribe>;
+  updateTribe(id: number, tribe: Partial<InsertTribe>): Promise<Tribe | undefined>;
+  deleteTribe(id: number): Promise<boolean>;
 
   getTeams(seasonId?: number): Promise<Team[]>;
   getTeam(id: number): Promise<Team | undefined>;
@@ -91,6 +98,34 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSeason(id: number): Promise<boolean> {
     const result = await db.delete(seasons).where(eq(seasons.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getTribes(seasonId?: number): Promise<Tribe[]> {
+    if (seasonId) {
+      return await db.select().from(tribes).where(eq(tribes.seasonId, seasonId));
+    }
+    return await db.select().from(tribes);
+  }
+
+  async getTribe(id: number): Promise<Tribe | undefined> {
+    const [tribe] = await db.select().from(tribes).where(eq(tribes.id, id));
+    return tribe;
+  }
+
+  async createTribe(tribe: InsertTribe): Promise<Tribe> {
+    const [newTribe] = await db.insert(tribes).values(tribe).returning();
+    return newTribe;
+  }
+
+  async updateTribe(id: number, tribe: Partial<InsertTribe>): Promise<Tribe | undefined> {
+    const [updated] = await db.update(tribes).set(tribe).where(eq(tribes.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTribe(id: number): Promise<boolean> {
+    await db.update(contestants).set({ tribeId: null }).where(eq(contestants.tribeId, id));
+    const result = await db.delete(tribes).where(eq(tribes.id, id));
     return (result.rowCount ?? 0) > 0;
   }
 
@@ -336,9 +371,9 @@ export class DatabaseStorage implements IStorage {
     const settings = await this.getSeasonEventSettings(seasonId);
     const settingsMap = new Map(settings.map(s => [s.eventKey, s.points]));
 
-    const contestants = await this.getContestants(seasonId);
+    const allContestants = await this.getContestants(seasonId);
     
-    for (const contestant of contestants) {
+    for (const contestant of allContestants) {
       const contestantEvts = events.filter(e => e.contestantId === contestant.id);
       let total = 0;
       for (const evt of contestantEvts) {

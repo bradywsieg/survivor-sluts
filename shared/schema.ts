@@ -14,11 +14,28 @@ export const seasonsRelations = relations(seasons, ({ many }) => ({
   contestants: many(contestants),
   weeks: many(weeks),
   eventSettings: many(seasonEventSettings),
+  tribes: many(tribes),
 }));
 
 export const insertSeasonSchema = createInsertSchema(seasons).omit({ id: true });
 export type InsertSeason = z.infer<typeof insertSeasonSchema>;
 export type Season = typeof seasons.$inferSelect;
+
+export const tribes = pgTable("tribes", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("#808080"),
+  seasonId: integer("season_id").references(() => seasons.id).notNull(),
+});
+
+export const tribesRelations = relations(tribes, ({ one, many }) => ({
+  season: one(seasons, { fields: [tribes.seasonId], references: [seasons.id] }),
+  contestants: many(contestants),
+}));
+
+export const insertTribeSchema = createInsertSchema(tribes).omit({ id: true });
+export type InsertTribe = z.infer<typeof insertTribeSchema>;
+export type Tribe = typeof tribes.$inferSelect;
 
 export const teams = pgTable("teams", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -44,6 +61,8 @@ export const contestants = pgTable("contestants", {
   teamId: integer("team_id").references(() => teams.id),
   eliminated: boolean("eliminated").default(false).notNull(),
   seasonId: integer("season_id").references(() => seasons.id),
+  tribeId: integer("tribe_id").references(() => tribes.id),
+  bio: text("bio"),
 });
 
 export const contestantsRelations = relations(contestants, ({ one, many }) => ({
@@ -52,6 +71,7 @@ export const contestantsRelations = relations(contestants, ({ one, many }) => ({
     references: [teams.id],
   }),
   season: one(seasons, { fields: [contestants.seasonId], references: [seasons.id] }),
+  tribe: one(tribes, { fields: [contestants.tribeId], references: [tribes.id] }),
   scores: many(contestantScores),
   events: many(contestantEvents),
 }));

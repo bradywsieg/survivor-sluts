@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTeamSchema, insertContestantSchema, insertWeekSchema, insertSeasonSchema } from "@shared/schema";
+import { insertTeamSchema, insertContestantSchema, insertWeekSchema, insertSeasonSchema, insertTribeSchema } from "@shared/schema";
 import { z } from "zod";
 
 const ADMIN_PIN = "1911";
@@ -147,6 +147,73 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete season" });
+    }
+  });
+
+  // Tribes API
+  app.get("/api/tribes", async (req, res) => {
+    try {
+      const seasonId = req.query.seasonId ? parseInt(req.query.seasonId as string) : undefined;
+      const tribesList = await storage.getTribes(seasonId);
+      res.json(tribesList);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch tribes" });
+    }
+  });
+
+  app.get("/api/tribes/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tribe = await storage.getTribe(id);
+      if (!tribe) {
+        return res.status(404).json({ error: "Tribe not found" });
+      }
+      res.json(tribe);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch tribe" });
+    }
+  });
+
+  app.post("/api/tribes", requirePin, async (req, res) => {
+    try {
+      const parsed = insertTribeSchema.parse(req.body);
+      const tribe = await storage.createTribe(parsed);
+      res.status(201).json(tribe);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create tribe" });
+    }
+  });
+
+  app.patch("/api/tribes/:id", requirePin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const parsed = insertTribeSchema.partial().parse(req.body);
+      const tribe = await storage.updateTribe(id, parsed);
+      if (!tribe) {
+        return res.status(404).json({ error: "Tribe not found" });
+      }
+      res.json(tribe);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update tribe" });
+    }
+  });
+
+  app.delete("/api/tribes/:id", requirePin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteTribe(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Tribe not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete tribe" });
     }
   });
 
@@ -579,6 +646,8 @@ export async function registerRoutes(
       const weeks = resolvedSeasonId ? await storage.getWeeks(resolvedSeasonId) : await storage.getWeeks();
       const allScores = resolvedSeasonId ? await storage.getContestantScoresBySeason(resolvedSeasonId) : await storage.getContestantScores();
       const allBonuses = resolvedSeasonId ? await storage.getTeamBonusesBySeason(resolvedSeasonId) : await storage.getTeamBonuses();
+      const tribesList = resolvedSeasonId ? await storage.getTribes(resolvedSeasonId) : [];
+      const allEvents = resolvedSeasonId ? await storage.getContestantEventsBySeason(resolvedSeasonId) : [];
 
       const teamTotals = teams.map(team => {
         const teamContestants = contestants.filter(c => c.teamId === team.id);
@@ -646,6 +715,34 @@ export async function registerRoutes(
           .map(s => ({ contestantId: s.contestantId, points: s.points }));
       });
 
+      const idolAdvantageKeys = [
+        "found-hidden-immunity-idol", "found-advantage", "gained-an-advantage",
+        "played-hidden-immunity-idol", "played-advantage", "used-advantage",
+        "idol-found", "advantage-found", "idol-played", "advantage-played"
+      ];
+      const gainKeys = idolAdvantageKeys.filter(k => k.includes("found") || k.includes("gained"));
+      const playKeys = idolAdvantageKeys.filter(k => k.includes("played") || k.includes("used"));
+
+      const idolWatch = contestants
+        .filter(c => !c.eliminated)
+        .map(c => {
+          const cEvents = allEvents.filter(e => e.contestantId === c.id);
+          const gained = cEvents.filter(e => e.eventKey && gainKeys.includes(e.eventKey));
+          const played = cEvents.filter(e => e.eventKey && playKeys.includes(e.eventKey));
+          const unplayed = gained.length - played.length;
+          if (unplayed <= 0) return null;
+          const tribe = tribesList.find(t => t.id === c.tribeId);
+          return {
+            contestantId: c.id,
+            name: c.name,
+            imageUrl: c.imageUrl,
+            tribeColor: tribe?.color || null,
+            tribeName: tribe?.name || null,
+            unplayedCount: unplayed,
+          };
+        })
+        .filter(Boolean);
+
       res.json({
         teams: teamTotals,
         contestants: contestantTotals,
@@ -654,6 +751,8 @@ export async function registerRoutes(
         teamNames: teams.map(t => t.name),
         teamImages: teams.reduce((acc, t) => { acc[t.name] = t.imageUrl || ""; return acc; }, {} as Record<string, string>),
         weeklyContestantScores,
+        tribes: tribesList,
+        idolWatch,
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch dashboard data" });

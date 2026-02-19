@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import SeasonSelector from "@/components/SeasonSelector";
 import PinGate from "@/components/PinGate";
 import { useSeason } from "@/hooks/use-season";
-import { Shield, Plus, X, Search, Calendar, Save, Zap } from "lucide-react";
+import { Shield, Plus, X, Search, Calendar, Save, Zap, Tv, Palette, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { adminApiRequest } from "@/lib/adminApi";
@@ -58,6 +59,19 @@ interface Bonus {
   bonus: number;
 }
 
+interface Season {
+  id: number;
+  name: string;
+  number: number;
+}
+
+interface Tribe {
+  id: number;
+  name: string;
+  color: string;
+  seasonId: number;
+}
+
 function AdminContent() {
   const { toast } = useToast();
   const [selectedWeekId, setSelectedWeekId] = useState<string>("");
@@ -70,7 +84,17 @@ function AdminContent() {
   const [customEventName, setCustomEventName] = useState("");
   const [customEventPoints, setCustomEventPoints] = useState("");
   const [editingPoints, setEditingPoints] = useState<Record<string, string>>({});
-  const [activeTab, setActiveTab] = useState<"scoring" | "settings">("scoring");
+  const [activeTab, setActiveTab] = useState<"scoring" | "settings" | "seasons" | "tribes">("scoring");
+
+  const [seasonDialogOpen, setSeasonDialogOpen] = useState(false);
+  const [editingSeason, setEditingSeason] = useState<Season | null>(null);
+  const [seasonName, setSeasonName] = useState("");
+  const [seasonNumber, setSeasonNumber] = useState("");
+
+  const [tribeDialogOpen, setTribeDialogOpen] = useState(false);
+  const [editingTribe, setEditingTribe] = useState<Tribe | null>(null);
+  const [tribeName, setTribeName] = useState("");
+  const [tribeColor, setTribeColor] = useState("#808080");
 
   const { data: contestants = [], isLoading: contestantsLoading } = useQuery<Contestant[]>({
     queryKey: ["/api/contestants", { seasonId: selectedSeasonId }],
@@ -133,6 +157,16 @@ function AdminContent() {
       return res.json();
     },
     enabled: !!selectedWeekId,
+  });
+
+  const { data: tribes = [], isLoading: tribesLoading } = useQuery<Tribe[]>({
+    queryKey: ["/api/tribes", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/tribes?seasonId=${selectedSeasonId}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId,
   });
 
   useEffect(() => {
@@ -228,6 +262,81 @@ function AdminContent() {
     },
   });
 
+  const createSeasonMutation = useMutation({
+    mutationFn: (data: { name: string; number: number }) =>
+      adminApiRequest("POST", "/api/seasons", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      toast({ title: "Season Created", description: "New season has been added." });
+      closeSeasonDialog();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create season.", variant: "destructive" });
+    },
+  });
+
+  const updateSeasonMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: { name: string; number: number } }) =>
+      adminApiRequest("PATCH", `/api/seasons/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      toast({ title: "Season Updated", description: "Season has been updated." });
+      closeSeasonDialog();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update season.", variant: "destructive" });
+    },
+  });
+
+  const deleteSeasonMutation = useMutation({
+    mutationFn: (id: number) => adminApiRequest("DELETE", `/api/seasons/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      toast({ title: "Season Deleted", description: "Season has been removed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete season.", variant: "destructive" });
+    },
+  });
+
+  const createTribeMutation = useMutation({
+    mutationFn: (data: { name: string; color: string; seasonId: number }) =>
+      adminApiRequest("POST", "/api/tribes", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tribes"] });
+      toast({ title: "Tribe Created", description: "New tribe has been added." });
+      closeTribeDialog();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create tribe.", variant: "destructive" });
+    },
+  });
+
+  const updateTribeMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: { name: string; color: string; seasonId: number } }) =>
+      adminApiRequest("PATCH", `/api/tribes/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tribes"] });
+      toast({ title: "Tribe Updated", description: "Tribe has been updated." });
+      closeTribeDialog();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update tribe.", variant: "destructive" });
+    },
+  });
+
+  const deleteTribeMutation = useMutation({
+    mutationFn: (id: number) => adminApiRequest("DELETE", `/api/tribes/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tribes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contestants"] });
+      toast({ title: "Tribe Deleted", description: "Tribe has been removed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete tribe.", variant: "destructive" });
+    },
+  });
+
   const handleAddWeek = () => {
     const newWeekNumber = weeks.length + 1;
     createWeekMutation.mutate(newWeekNumber);
@@ -290,6 +399,73 @@ function AdminContent() {
     });
   };
 
+  const closeSeasonDialog = () => {
+    setSeasonDialogOpen(false);
+    setEditingSeason(null);
+    setSeasonName("");
+    setSeasonNumber("");
+  };
+
+  const openCreateSeason = () => {
+    setEditingSeason(null);
+    const nextNumber = seasons.length > 0 ? Math.max(...seasons.map(s => s.number)) + 1 : 1;
+    setSeasonName(`Season ${nextNumber}`);
+    setSeasonNumber(nextNumber.toString());
+    setSeasonDialogOpen(true);
+  };
+
+  const openEditSeason = (season: Season) => {
+    setEditingSeason(season);
+    setSeasonName(season.name);
+    setSeasonNumber(season.number.toString());
+    setSeasonDialogOpen(true);
+  };
+
+  const handleSeasonSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const num = parseInt(seasonNumber);
+    if (!seasonName.trim() || isNaN(num)) return;
+
+    if (editingSeason) {
+      updateSeasonMutation.mutate({ id: editingSeason.id, data: { name: seasonName.trim(), number: num } });
+    } else {
+      createSeasonMutation.mutate({ name: seasonName.trim(), number: num });
+    }
+  };
+
+  const closeTribeDialog = () => {
+    setTribeDialogOpen(false);
+    setEditingTribe(null);
+    setTribeName("");
+    setTribeColor("#808080");
+  };
+
+  const openCreateTribe = () => {
+    setEditingTribe(null);
+    setTribeName("");
+    setTribeColor("#808080");
+    setTribeDialogOpen(true);
+  };
+
+  const openEditTribe = (tribe: Tribe) => {
+    setEditingTribe(tribe);
+    setTribeName(tribe.name);
+    setTribeColor(tribe.color);
+    setTribeDialogOpen(true);
+  };
+
+  const handleTribeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tribeName.trim() || !selectedSeasonId) return;
+    const seasonIdNum = parseInt(selectedSeasonId);
+
+    if (editingTribe) {
+      updateTribeMutation.mutate({ id: editingTribe.id, data: { name: tribeName.trim(), color: tribeColor, seasonId: seasonIdNum } });
+    } else {
+      createTribeMutation.mutate({ name: tribeName.trim(), color: tribeColor, seasonId: seasonIdNum });
+    }
+  };
+
   const isLoading = contestantsLoading || weeksLoading;
 
   if (isLoading) {
@@ -322,7 +498,7 @@ function AdminContent() {
           </div>
         </div>
 
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 flex-wrap">
           <Button
             variant={activeTab === "scoring" ? "default" : "outline"}
             onClick={() => setActiveTab("scoring")}
@@ -338,6 +514,22 @@ function AdminContent() {
           >
             <Zap className="h-4 w-4 mr-2" />
             Point Value Settings
+          </Button>
+          <Button
+            variant={activeTab === "seasons" ? "default" : "outline"}
+            onClick={() => setActiveTab("seasons")}
+            data-testid="button-tab-seasons"
+          >
+            <Tv className="h-4 w-4 mr-2" />
+            Seasons
+          </Button>
+          <Button
+            variant={activeTab === "tribes" ? "default" : "outline"}
+            onClick={() => setActiveTab("tribes")}
+            data-testid="button-tab-tribes"
+          >
+            <Palette className="h-4 w-4 mr-2" />
+            Tribes
           </Button>
         </div>
 
@@ -554,6 +746,156 @@ function AdminContent() {
           </Card>
         )}
 
+        {activeTab === "seasons" && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
+              <CardTitle className="text-xl font-['Slackey'] tracking-wide flex items-center gap-2">
+                <Tv className="h-5 w-5 text-primary" />
+                Seasons
+              </CardTitle>
+              <Button onClick={openCreateSeason} className="gap-2" data-testid="button-add-season">
+                <Plus className="h-4 w-4" />
+                New Season
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {seasons.length === 0 ? (
+                <div className="text-center py-12">
+                  <Tv className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <h2 className="text-xl font-semibold mb-2">No Seasons Yet</h2>
+                  <p className="text-muted-foreground mb-4">Create your first season to get started!</p>
+                  <Button onClick={openCreateSeason} className="gap-2" data-testid="button-create-first-season">
+                    <Plus className="h-4 w-4" />
+                    Create First Season
+                  </Button>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-24 text-center">Number</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="w-24 text-center">Status</TableHead>
+                      <TableHead className="w-24 text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {seasons.map((season, index) => (
+                      <TableRow key={season.id} data-testid={`row-season-${season.id}`}>
+                        <TableCell className="text-center font-semibold">{season.number}</TableCell>
+                        <TableCell className="font-medium">{season.name}</TableCell>
+                        <TableCell className="text-center">
+                          {index === 0 ? (
+                            <Badge variant="default" className="text-xs">Current</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">Past</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditSeason(season)}
+                              data-testid={`button-edit-season-${season.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deleteSeasonMutation.mutate(season.id)}
+                              data-testid={`button-delete-season-${season.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === "tribes" && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
+              <CardTitle className="text-xl font-['Slackey'] tracking-wide flex items-center gap-2">
+                <Palette className="h-5 w-5 text-primary" />
+                Tribes
+              </CardTitle>
+              <Button onClick={openCreateTribe} className="gap-2" disabled={!selectedSeasonId} data-testid="button-add-tribe">
+                <Plus className="h-4 w-4" />
+                New Tribe
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {!selectedSeasonId ? (
+                <p className="text-center text-muted-foreground py-8">Select a season to manage tribes.</p>
+              ) : tribesLoading ? (
+                <Skeleton className="h-48 w-full" />
+              ) : tribes.length === 0 ? (
+                <div className="text-center py-12">
+                  <Palette className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <h2 className="text-xl font-semibold mb-2">No Tribes Yet</h2>
+                  <p className="text-muted-foreground mb-4">Create tribes for this season.</p>
+                  <Button onClick={openCreateTribe} className="gap-2" data-testid="button-create-first-tribe">
+                    <Plus className="h-4 w-4" />
+                    Create First Tribe
+                  </Button>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16">Color</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="w-24 text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tribes.map((tribe) => (
+                      <TableRow key={tribe.id} data-testid={`row-tribe-${tribe.id}`}>
+                        <TableCell>
+                          <div
+                            className="h-5 w-5 rounded-full border"
+                            style={{ backgroundColor: tribe.color }}
+                            data-testid={`swatch-tribe-${tribe.id}`}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{tribe.name}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditTribe(tribe)}
+                              data-testid={`button-edit-tribe-${tribe.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deleteTribeMutation.mutate(tribe.id)}
+                              data-testid={`button-delete-tribe-${tribe.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <Dialog open={addEventContestantId !== null} onOpenChange={(open) => { if (!open) setAddEventContestantId(null); }}>
           <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
             <DialogHeader>
@@ -646,6 +988,105 @@ function AdminContent() {
                 </DialogFooter>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={seasonDialogOpen} onOpenChange={(open) => { if (!open) closeSeasonDialog(); else setSeasonDialogOpen(open); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-['Slackey'] text-xl tracking-wide">
+                {editingSeason ? "Edit Season" : "New Season"}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSeasonSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="seasonNumber">Season Number</Label>
+                <Input
+                  id="seasonNumber"
+                  type="number"
+                  value={seasonNumber}
+                  onChange={(e) => setSeasonNumber(e.target.value)}
+                  placeholder="e.g. 49"
+                  data-testid="input-season-number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="seasonName">Season Name</Label>
+                <Input
+                  id="seasonName"
+                  value={seasonName}
+                  onChange={(e) => setSeasonName(e.target.value)}
+                  placeholder="e.g. Season 49"
+                  data-testid="input-season-name"
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={closeSeasonDialog}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createSeasonMutation.isPending || updateSeasonMutation.isPending}
+                  data-testid="button-submit-season"
+                >
+                  {editingSeason ? "Save Changes" : "Create Season"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={tribeDialogOpen} onOpenChange={(open) => { if (!open) closeTribeDialog(); else setTribeDialogOpen(open); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-['Slackey'] text-xl tracking-wide">
+                {editingTribe ? "Edit Tribe" : "New Tribe"}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleTribeSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="tribeName">Tribe Name</Label>
+                <Input
+                  id="tribeName"
+                  value={tribeName}
+                  onChange={(e) => setTribeName(e.target.value)}
+                  placeholder="e.g. Lavo"
+                  data-testid="input-tribe-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tribeColor">Tribe Color</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    id="tribeColor"
+                    type="color"
+                    value={tribeColor}
+                    onChange={(e) => setTribeColor(e.target.value)}
+                    className="h-9 w-14 cursor-pointer rounded-md border"
+                    data-testid="input-tribe-color"
+                  />
+                  <Input
+                    value={tribeColor}
+                    onChange={(e) => setTribeColor(e.target.value)}
+                    placeholder="#808080"
+                    className="flex-1"
+                    data-testid="input-tribe-color-hex"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={closeTribeDialog}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createTribeMutation.isPending || updateTribeMutation.isPending}
+                  data-testid="button-submit-tribe"
+                >
+                  {editingTribe ? "Save Changes" : "Create Tribe"}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>

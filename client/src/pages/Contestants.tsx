@@ -18,11 +18,20 @@ interface Contestant {
   teamId?: number | null;
   eliminated?: boolean;
   seasonId?: number | null;
+  tribeId?: number | null;
+  bio?: string | null;
 }
 
 interface Team {
   id: number;
   name: string;
+}
+
+interface Tribe {
+  id: number;
+  name: string;
+  color: string;
+  seasonId: number;
 }
 
 export default function Contestants() {
@@ -53,6 +62,17 @@ export default function Contestants() {
     enabled: !!selectedSeasonId || seasons.length === 0,
   });
 
+  const { data: tribes = [] } = useQuery<Tribe[]>({
+    queryKey: ["/api/tribes", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const url = selectedSeasonId ? `/api/tribes?seasonId=${selectedSeasonId}` : `/api/tribes`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId || seasons.length === 0,
+  });
+
   const { data: allScores = [] } = useQuery<{ contestantId: number; points: number }[]>({
     queryKey: ["/api/scores", { seasonId: selectedSeasonId }],
     queryFn: async () => {
@@ -65,7 +85,7 @@ export default function Contestants() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; imageUrl?: string | null; teamId?: number; eliminated: boolean }) => 
+    mutationFn: (data: { name: string; imageUrl?: string | null; teamId?: number; eliminated: boolean; tribeId?: number | null; bio?: string | null }) => 
       apiRequest("POST", "/api/contestants", { ...data, seasonId: selectedSeasonId ? parseInt(selectedSeasonId) : undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contestants"] });
@@ -108,7 +128,7 @@ export default function Contestants() {
       .reduce((sum, s) => sum + s.points, 0);
   };
 
-  const handleSubmit = (data: { name: string; imageUrl?: string | null; teamId?: number; eliminated: boolean }) => {
+  const handleSubmit = (data: { name: string; imageUrl?: string | null; teamId?: number; eliminated: boolean; tribeId?: number | null; bio?: string | null }) => {
     if (editingContestant) {
       updateMutation.mutate({ id: editingContestant.id, data });
     } else {
@@ -131,6 +151,11 @@ export default function Contestants() {
   const handleDialogClose = (open: boolean) => {
     setDialogOpen(open);
     if (!open) setEditingContestant(null);
+  };
+
+  const getTribe = (tribeId: number | null | undefined) => {
+    if (!tribeId) return undefined;
+    return tribes.find(t => t.id === tribeId);
   };
 
   const activeContestants = contestants.filter(c => !c.eliminated);
@@ -185,19 +210,25 @@ export default function Contestants() {
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4">Active ({activeContestants.length})</h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeContestants.map((contestant) => (
-                <ContestantCard
-                  key={contestant.id}
-                  id={contestant.id}
-                  name={contestant.name}
-                  imageUrl={contestant.imageUrl || undefined}
-                  totalPoints={calculateContestantPoints(contestant.id)}
-                  teamName={teams.find(t => t.id === contestant.teamId)?.name}
-                  eliminated={contestant.eliminated}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                />
-              ))}
+              {activeContestants.map((contestant) => {
+                const tribe = getTribe(contestant.tribeId);
+                return (
+                  <ContestantCard
+                    key={contestant.id}
+                    id={contestant.id}
+                    name={contestant.name}
+                    imageUrl={contestant.imageUrl || undefined}
+                    totalPoints={calculateContestantPoints(contestant.id)}
+                    teamName={teams.find(t => t.id === contestant.teamId)?.name}
+                    eliminated={contestant.eliminated}
+                    tribeColor={tribe?.color}
+                    tribeName={tribe?.name}
+                    bio={contestant.bio || undefined}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                );
+              })}
             </div>
           </div>
         )}
@@ -206,19 +237,25 @@ export default function Contestants() {
           <div>
             <h2 className="text-xl font-semibold mb-4 text-muted-foreground">Eliminated ({eliminatedContestants.length})</h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {eliminatedContestants.map((contestant) => (
-                <ContestantCard
-                  key={contestant.id}
-                  id={contestant.id}
-                  name={contestant.name}
-                  imageUrl={contestant.imageUrl || undefined}
-                  totalPoints={calculateContestantPoints(contestant.id)}
-                  teamName={teams.find(t => t.id === contestant.teamId)?.name}
-                  eliminated={contestant.eliminated}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                />
-              ))}
+              {eliminatedContestants.map((contestant) => {
+                const tribe = getTribe(contestant.tribeId);
+                return (
+                  <ContestantCard
+                    key={contestant.id}
+                    id={contestant.id}
+                    name={contestant.name}
+                    imageUrl={contestant.imageUrl || undefined}
+                    totalPoints={calculateContestantPoints(contestant.id)}
+                    teamName={teams.find(t => t.id === contestant.teamId)?.name}
+                    eliminated={contestant.eliminated}
+                    tribeColor={tribe?.color}
+                    tribeName={tribe?.name}
+                    bio={contestant.bio || undefined}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                );
+              })}
             </div>
           </div>
         )}
@@ -239,12 +276,15 @@ export default function Contestants() {
           open={dialogOpen}
           onOpenChange={handleDialogClose}
           teams={teams}
+          tribes={tribes}
           initialData={editingContestant ? {
             id: editingContestant.id,
             name: editingContestant.name,
             imageUrl: editingContestant.imageUrl || undefined,
             teamId: editingContestant.teamId || undefined,
             eliminated: editingContestant.eliminated,
+            tribeId: editingContestant.tribeId || undefined,
+            bio: editingContestant.bio || undefined,
           } : undefined}
           onSubmit={handleSubmit}
         />

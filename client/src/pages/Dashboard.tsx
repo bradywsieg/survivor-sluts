@@ -6,16 +6,37 @@ import ContestantPerformanceChart from "@/components/ContestantPerformanceChart"
 import SeasonSelector from "@/components/SeasonSelector";
 import { useSeason } from "@/hooks/use-season";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Eye } from "lucide-react";
+
+interface Tribe {
+  id: number;
+  name: string;
+  color: string;
+  seasonId: number;
+}
+
+interface IdolWatchItem {
+  contestantId: number;
+  name: string;
+  imageUrl?: string | null;
+  tribeColor?: string | null;
+  tribeName?: string | null;
+  unplayedCount: number;
+}
 
 interface DashboardData {
   teams: { id: number; name: string; imageUrl?: string; totalPoints: number; contestants: any[] }[];
-  contestants: { id: number; name: string; imageUrl?: string; totalPoints: number; teamName?: string; eliminated?: boolean }[];
+  contestants: { id: number; name: string; imageUrl?: string; totalPoints: number; teamName?: string; eliminated?: boolean; tribeId?: number | null }[];
   weeks: { id: number; weekNumber: number }[];
   weeklyData: Record<string, string | number>[];
   teamNames: string[];
   teamImages: Record<string, string>;
   weeklyContestantScores: Record<number, { contestantId: number; points: number }[]>;
+  tribes: Tribe[];
+  idolWatch: IdolWatchItem[];
 }
 
 export default function Dashboard() {
@@ -74,14 +95,20 @@ export default function Dashboard() {
   const teamImages = data?.teamImages || {};
   const weeks = data?.weeks || [];
   const weeklyContestantScores = data?.weeklyContestantScores || {};
+  const tribesList = data?.tribes || [];
+  const idolWatch = data?.idolWatch || [];
 
-  const contestantChartData = contestants.map(c => ({
-    id: c.id,
-    name: c.name,
-    imageUrl: c.imageUrl,
-    points: c.totalPoints,
-    eliminated: c.eliminated,
-  }));
+  const contestantChartData = contestants.map(c => {
+    const tribe = tribesList.find(t => t.id === c.tribeId);
+    return {
+      id: c.id,
+      name: c.name,
+      imageUrl: c.imageUrl,
+      points: c.totalPoints,
+      eliminated: c.eliminated,
+      tribeColor: tribe?.color,
+    };
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -108,6 +135,55 @@ export default function Dashboard() {
             </Card>
           )}
         </div>
+
+        {idolWatch.length > 0 && (
+          <div className="mt-8">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
+                <CardTitle className="flex items-center gap-2 text-2xl font-bold font-['Slackey'] tracking-wide">
+                  <Eye className="h-6 w-6 text-primary" />
+                  Idol & Advantage Watch
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {idolWatch.map((item) => (
+                    <div
+                      key={item.contestantId}
+                      className="flex items-center gap-3 p-3 border rounded-md"
+                      style={item.tribeColor ? { borderLeft: `4px solid ${item.tribeColor}` } : undefined}
+                      data-testid={`idol-watch-${item.contestantId}`}
+                    >
+                      <Avatar className="h-10 w-10 shrink-0">
+                        <AvatarImage src={item.imageUrl || undefined} alt={item.name} />
+                        <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
+                          {item.name.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <span className="font-medium text-sm block truncate">{item.name}</span>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <Badge variant="secondary" className="text-xs">
+                            {item.unplayedCount} unplayed
+                          </Badge>
+                          {item.tribeName && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <span
+                                className="inline-block w-2 h-2 rounded-full"
+                                style={{ backgroundColor: item.tribeColor || undefined }}
+                              />
+                              {item.tribeName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
         
         <div className="mt-8">
           {contestantChartData.length > 0 ? (

@@ -11,6 +11,7 @@ interface ContestantData {
   imageUrl?: string;
   points: number;
   eliminated?: boolean;
+  tribeColor?: string;
 }
 
 interface Week {
@@ -29,12 +30,17 @@ function ContestantAvatarTick({ x, y, payload, contestantMap }: any) {
   const contestant = contestantMap[payload.value];
   const imageUrl = contestant?.imageUrl;
   const contestantId = contestant?.id || 0;
+  const tribeColor = contestant?.tribeColor;
   const name = payload.value;
   const radius = 10;
   const textX = x - radius * 2 - 6;
+  const outlineWidth = tribeColor ? 2 : 0;
 
   return (
     <g>
+      {tribeColor && (
+        <circle cx={x - radius - 2} cy={y} r={radius + outlineWidth} fill={tribeColor} />
+      )}
       {imageUrl ? (
         <g>
           <defs>
@@ -96,9 +102,9 @@ export default function ContestantPerformanceChart({
   const activeWeekId = selectedWeekId || latestWeekId;
 
   const contestantMap = useMemo(() => {
-    const map: Record<string, { id: number; imageUrl?: string }> = {};
+    const map: Record<string, { id: number; imageUrl?: string; tribeColor?: string }> = {};
     data.forEach(c => {
-      map[c.name] = { id: c.id, imageUrl: c.imageUrl };
+      map[c.name] = { id: c.id, imageUrl: c.imageUrl, tribeColor: c.tribeColor };
     });
     return map;
   }, [data]);
@@ -112,13 +118,17 @@ export default function ContestantPerformanceChart({
     const scoreMap = new Map(weekScores.map(s => [s.contestantId, s.points]));
     
     return contestants
-      .map(c => ({
-        id: c.id,
-        name: c.name,
-        imageUrl: c.imageUrl,
-        points: scoreMap.get(c.id) || 0,
-        eliminated: c.eliminated,
-      }))
+      .map(c => {
+        const d = data.find(d => d.id === c.id);
+        return {
+          id: c.id,
+          name: c.name,
+          imageUrl: c.imageUrl,
+          points: scoreMap.get(c.id) || 0,
+          eliminated: c.eliminated,
+          tribeColor: d?.tribeColor,
+        };
+      })
       .sort((a, b) => b.points - a.points);
   }, [viewMode, data, activeWeekId, weeklyContestantScores, contestants]);
 

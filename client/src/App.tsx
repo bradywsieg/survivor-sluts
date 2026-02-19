@@ -9,7 +9,6 @@ import Teams from "@/pages/Teams";
 import Contestants from "@/pages/Contestants";
 import Admin from "@/pages/Admin";
 import Rules from "@/pages/Rules";
-import Seasons from "@/pages/Seasons";
 import Navbar from "@/components/Navbar";
 
 function Router() {
@@ -20,7 +19,6 @@ function Router() {
       <Route path="/contestants" component={Contestants} />
       <Route path="/admin" component={Admin} />
       <Route path="/rules" component={Rules} />
-      <Route path="/seasons" component={Seasons} />
       <Route component={NotFound} />
     </Switch>
   );

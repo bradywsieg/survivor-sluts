@@ -16,6 +16,13 @@ interface Contestant {
   name: string;
   imageUrl?: string;
   teamId?: number;
+  tribeId?: number | null;
+}
+
+interface Tribe {
+  id: number;
+  name: string;
+  color: string;
 }
 
 interface Team {
@@ -57,6 +64,17 @@ export default function Teams() {
     queryKey: ["/api/scores", { seasonId: selectedSeasonId }],
     queryFn: async () => {
       const url = selectedSeasonId ? `/api/scores?seasonId=${selectedSeasonId}` : `/api/scores`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!selectedSeasonId || seasons.length === 0,
+  });
+
+  const { data: tribes = [] } = useQuery<Tribe[]>({
+    queryKey: ["/api/tribes", { seasonId: selectedSeasonId }],
+    queryFn: async () => {
+      const url = selectedSeasonId ? `/api/tribes?seasonId=${selectedSeasonId}` : `/api/tribes`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
@@ -202,7 +220,10 @@ export default function Teams() {
               name={team.name}
               imageUrl={team.imageUrl}
               totalPoints={calculateTeamPoints(team.id)}
-              contestants={contestants.filter(c => c.teamId === team.id)}
+              contestants={contestants.filter(c => c.teamId === team.id).map(c => ({
+                ...c,
+                tribeColor: tribes.find(t => t.id === c.tribeId)?.color,
+              }))}
               onEdit={handleEdit}
               onDelete={handleDelete}
             />

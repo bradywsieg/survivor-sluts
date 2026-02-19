@@ -79,7 +79,7 @@ export default function TeamPointsChart({ data, teamNames, teamImages }: TeamPoi
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
         <CardTitle className="flex items-center gap-2 text-2xl font-bold font-['Slackey'] tracking-wide">
           <TrendingUp className="h-6 w-6 text-primary" />
-          Points by Week
+          Team Scoring by Week
         </CardTitle>
       </CardHeader>
       <CardContent>

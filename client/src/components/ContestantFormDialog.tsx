@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -13,24 +14,34 @@ interface Team {
   name: string;
 }
 
+interface Tribe {
+  id: number;
+  name: string;
+  color: string;
+}
+
 interface ContestantFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   teams: Team[];
+  tribes?: Tribe[];
   initialData?: {
     id?: number;
     name: string;
     imageUrl?: string;
     teamId?: number;
     eliminated?: boolean;
+    tribeId?: number;
+    bio?: string;
   };
-  onSubmit: (data: { name: string; imageUrl?: string | null; teamId?: number; eliminated: boolean }) => void;
+  onSubmit: (data: { name: string; imageUrl?: string | null; teamId?: number; eliminated: boolean; tribeId?: number | null; bio?: string | null }) => void;
 }
 
 export default function ContestantFormDialog({ 
   open, 
   onOpenChange, 
   teams,
+  tribes = [],
   initialData,
   onSubmit 
 }: ContestantFormDialogProps) {
@@ -38,6 +49,8 @@ export default function ContestantFormDialog({
   const [imageUrl, setImageUrl] = useState("");
   const [teamId, setTeamId] = useState<string>("");
   const [eliminated, setEliminated] = useState(false);
+  const [tribeId, setTribeId] = useState<string>("");
+  const [bio, setBio] = useState("");
   const isEditing = !!initialData?.id;
 
   useEffect(() => {
@@ -46,6 +59,8 @@ export default function ContestantFormDialog({
       setImageUrl(initialData?.imageUrl || "");
       setTeamId(initialData?.teamId?.toString() || "");
       setEliminated(initialData?.eliminated || false);
+      setTribeId(initialData?.tribeId?.toString() || "");
+      setBio(initialData?.bio || "");
     }
   }, [open, initialData]);
 
@@ -56,11 +71,15 @@ export default function ContestantFormDialog({
         name: name.trim(), 
         imageUrl: imageUrl.trim() || null,
         teamId: teamId ? parseInt(teamId) : undefined,
-        eliminated
+        eliminated,
+        tribeId: tribeId && tribeId !== "none" ? parseInt(tribeId) : null,
+        bio: bio.trim() || null,
       });
       onOpenChange(false);
     }
   };
+
+  const selectedTribe = tribes.find(t => t.id.toString() === tribeId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -124,6 +143,53 @@ export default function ContestantFormDialog({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {tribes.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="tribe">Tribe</Label>
+              <Select value={tribeId} onValueChange={setTribeId}>
+                <SelectTrigger data-testid="select-contestant-tribe">
+                  <SelectValue placeholder="Select a tribe (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Tribe</SelectItem>
+                  {tribes.map((tribe) => (
+                    <SelectItem key={tribe.id} value={tribe.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full shrink-0"
+                          style={{ backgroundColor: tribe.color }}
+                        />
+                        {tribe.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedTribe && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: selectedTribe.color }}
+                  />
+                  {selectedTribe.name}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="bio">Bio (optional)</Label>
+            <Textarea
+              id="bio"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="Short bio or description..."
+              className="resize-none"
+              rows={3}
+              data-testid="input-contestant-bio"
+            />
           </div>
 
           <div className="flex items-center justify-between">

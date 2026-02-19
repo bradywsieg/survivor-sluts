@@ -1,0 +1,21 @@
+Make the following updates to the app:
+Update the Admin interface:
+Move the “seasons” menu within the admin interface as a new tab next to the “Point Value Settings” tab. 
+Add a new “Tribes” tab to the admin interface. This page should contain a similar UI and functionality as the contestants screen. Tribes will be captured on a per season basis in the DB. Users can add and edit tribes on this screen. Users will have the ability to edit the tribe name and set the tribe color via a standard color picker tool. 
+Update the Contestants interface:
+Add a Tribe dropdown field for each contestant within the edit modal. 
+Users need the ability to un-assign tribes completely, as well as switch tribes. 
+Add a “Contestant Bio” text field to capture each contestant's bio. These will be blank by default each season. 
+Display the first two lines of the bio on the contestant cards shown in the contestants screen. Text should be cut off with an ellipsis after two lines. Clickable “See more” text will be shown if the bio is cut off, clicking will open the contestant modal and display the full bio. 
+Update “Points by week” graph label to “Team Scoring by Week”
+Add an “Idol & Advantage Watch” container somewhere on the dashboard, use your discretion based on web design best practices (do what looks best). This container needs to display any users who currently possess an Idol or Advantage. We should display their name and avatar along with a pill or similar UI element indicating if they have an idol or advantage. If a user has more than one of either add an indicator of the quantity (x1, x2, etc). The logic to determine which players possess an idol or advantage is as follows:
+Contestant possess an idol if they have the “Gains idol (has to be activated)” event, is NOT eliminated, AND do not have any of the following events assigned:
+“Plays idol and person it is played for gets zero votes (including self)”
+“Plays idol at tribal”
+Contestant posses an advantage if they have the “Gains any advantage (has to be activated) other than idol” event assigned, is NOT eliminated, AND does not have any of the following events assigned:
+“Plays advantage (extra vote, steal vote etc.)”
+Add a UI treatment for tribes in various places:
+Contestant interface:  Once a tribe is assigned the tribe name should be displayed on the contestant card and the color of the card should be updated to match the tribe color. Use your discretion with this UI treatment, the contestant cards need to still be readable when the tribe UI is applied. 
+Teams interface: player pills should reflect the tribe color in some way (if a tribe is assigned). 
+Dashboard: Find a subtle way to add the tribe color to the Contestant Performance graph. Ideas: outline the contestant's avatar in the tribe color, add a border around the contestant's name in the tribe color? I am flexible, use your discretion on the UI treatment here based on web design best practices.  
+Seed the Tribe and Bio fields with data from this article: https://ew.com/survivor-50-official-cast-photos-bios-tribe-divisions-revealed-11891991

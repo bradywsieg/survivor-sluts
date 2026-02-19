@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Palmtree, Trophy, Users, UserCircle, BookOpen, Menu, X, Tv, Shield } from "lucide-react";
+import { Palmtree, Trophy, Users, UserCircle, BookOpen, Menu, X, Shield } from "lucide-react";
 import { useState } from "react";
 
 interface NavItem {
@@ -15,7 +15,6 @@ const navItems: NavItem[] = [
   { label: "Contestants", href: "/contestants", icon: UserCircle },
   { label: "Rules", href: "/rules", icon: BookOpen },
   { label: "Admin", href: "/admin", icon: Shield },
-  { label: "Seasons", href: "/seasons", icon: Tv },
 ];
 
 export default function Navbar() {

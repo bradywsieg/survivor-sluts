@@ -8,6 +8,7 @@ interface Contestant {
   id: number;
   name: string;
   imageUrl?: string;
+  tribeColor?: string;
 }
 
 interface TeamCardProps {
@@ -78,7 +79,11 @@ export default function TeamCard({
             {contestants.map((contestant) => (
               <div 
                 key={contestant.id}
-                className="flex items-center gap-2 bg-muted rounded-full pl-1 pr-3 py-1"
+                className={`flex items-center gap-2 rounded-full pl-1 pr-3 py-1 ${!contestant.tribeColor ? 'bg-muted' : ''}`}
+                style={contestant.tribeColor 
+                  ? { backgroundColor: `${contestant.tribeColor}20`, border: `1px solid ${contestant.tribeColor}40` }
+                  : undefined
+                }
               >
                 <Avatar className="h-6 w-6">
                   <AvatarImage src={contestant.imageUrl} alt={contestant.name} />

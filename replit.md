@@ -26,17 +26,18 @@ Preferred communication style: Simple, everyday language.
 - **Admin Protection**: PIN-based authentication via `X-Commissioner-Pin` header, validated server-side
 
 ### Data Model
-The application manages eight core entities:
+The application manages nine core entities:
 1. **Seasons** - Seasons of the Survivor show (e.g., Season 49, Season 50)
-2. **Teams** - Fantasy league teams with name, image, and season association
-3. **Contestants** - Survivor show contestants, assigned to teams and seasons, can be eliminated
-4. **Weeks** - Episode/week tracking for scoring, tied to a season
-5. **Contestant Scores** - Computed points earned by contestants per week (recalculated from events)
-6. **Team Bonuses** - Additional team-level bonus points per week
-7. **Season Event Settings** - Scoring rubric per season (event name, key, point value). Seeded from CSV on first access.
-8. **Contestant Events** - Individual event assignments per contestant per week. Custom events use pointsOverride; standard events look up points from season_event_settings.
+2. **Tribes** - In-game tribes per season with name and hex color (e.g., Vatu #7B2D8E, Cila #E87722, Kalo #00A79D)
+3. **Teams** - Fantasy league teams with name, image, and season association
+4. **Contestants** - Survivor show contestants, assigned to teams, tribes, and seasons; have optional bio text; can be eliminated
+5. **Weeks** - Episode/week tracking for scoring, tied to a season
+6. **Contestant Scores** - Computed points earned by contestants per week (recalculated from events)
+7. **Team Bonuses** - Additional team-level bonus points per week
+8. **Season Event Settings** - Scoring rubric per season (event name, key, point value). Seeded from CSV on first access.
+9. **Contestant Events** - Individual event assignments per contestant per week. Custom events use pointsOverride; standard events look up points from season_event_settings.
 
-All teams, contestants, and weeks are scoped to a season via `seasonId` foreign key.
+All teams, contestants, tribes, and weeks are scoped to a season via `seasonId` foreign key.
 
 ### Scoring System
 - Event-based scoring: admins assign events to contestants per week using multi-select or custom events
@@ -46,12 +47,11 @@ All teams, contestants, and weeks are scoped to a season via `seasonId` foreign 
 - Default rubric seeded from `server/data/PointValues_Survivor.csv` (42 events)
 
 ### Pages
-- `/` - Dashboard with hero banner, standings table, charts, season dropdown
-- `/teams` - Teams CRUD management with season filtering
-- `/contestants` - Contestants CRUD management with season filtering
+- `/` - Dashboard with hero banner, standings table, charts, season dropdown, Idol & Advantage Watch section
+- `/teams` - Teams CRUD management with season filtering, tribe color treatments on contestant pills
+- `/contestants` - Contestants CRUD management with season filtering, tribe assignment, bio field with See more/less
 - `/rules` - Public read-only scoring rubric display with season selector
-- `/admin` - PIN-protected admin area with Enter Results (event assignment) and Point Value Settings tabs
-- `/seasons` - Seasons CRUD management
+- `/admin` - PIN-protected admin area with 4 tabs: Enter Results, Point Value Settings, Seasons, Tribes
 
 ### Design System
 - Survivor/adventure theme with tropical motifs
@@ -78,15 +78,18 @@ shared/           # Shared types and schema
 ```
 
 ## Recent Changes
-- Implemented event-based scoring system replacing manual numeric entry
-- Added season_event_settings and contestant_events database tables
-- Added PIN-protected Admin area (PIN: 1911) with event assignment UI and point value settings
-- Added public Rules page showing scoring rubric per season
-- Renamed "Scoring" nav item to "Admin", added "Rules" nav item
-- Default scoring rubric seeded from CSV (42 Survivor events with point values)
-- Rubric edits retroactively recalculate all scores for the season
-- Eliminated contestants are disabled for adding new events
-- Admin API routes protected with X-Commissioner-Pin header validation
+- Added Tribes feature: tribes table with seasonId and hex color, tribeId/bio fields on contestants
+- Tribe CRUD in Admin area (Tribes tab) with color picker UI
+- Moved Seasons management into Admin as a tab, removed standalone /seasons page
+- Admin now has 4 tabs: Enter Results, Point Value Settings, Seasons, Tribes
+- ContestantCard shows tribe color left border, tribe name, and bio with See more/less toggle
+- ContestantFormDialog includes tribe dropdown and bio textarea
+- TeamCard contestant pills styled with tribe colors (background + border)
+- ContestantPerformanceChart avatars have tribe color ring outlines
+- Dashboard chart renamed to "Team Scoring by Week"
+- Added Idol & Advantage Watch dashboard section (event-based idol/advantage tracking)
+- Dashboard API returns tribes and idolWatch data
+- Seeded Season 50 with 3 tribes (Vatu/purple, Cila/orange, Kalo/teal) and contestant bios
 - PWA configured with custom app icon, manifest, and service worker
 
 ## External Dependencies
