@@ -715,37 +715,56 @@ export async function registerRoutes(
           .map(s => ({ contestantId: s.contestantId, points: s.points }));
       });
 
-      const isIdol = (key: string, name: string) => {
-        const text = `${key} ${name}`.toLowerCase();
-        return text.includes("idol");
-      };
-      const isAdvantage = (key: string, name: string) => {
-        const text = `${key} ${name}`.toLowerCase();
-        return text.includes("advantage");
-      };
-      const isGain = (key: string, name: string) => {
-        const text = `${key} ${name}`.toLowerCase();
-        return text.includes("gain") || text.includes("found") || text.includes("find");
-      };
-      const isPlay = (key: string, name: string) => {
-        const text = `${key} ${name}`.toLowerCase();
-        return text.includes("play") || text.includes("used") || text.includes("use");
+      const classifyEvent = (key: string, name: string): { type: "idol" | "advantage" | null; action: "gain" | "play" | "lose" | null } => {
+        const k = key.toLowerCase();
+        const n = name.toLowerCase();
+
+        const isAdvantageNotIdol = k.includes("advantage") && (k.includes("other-than-idol") || n.includes("other than idol"));
+        const mentionsIdol = k.includes("idol") || n.includes("idol");
+        const mentionsAdvantage = k.includes("advantage") || n.includes("advantage");
+
+        let type: "idol" | "advantage" | null = null;
+        if (isAdvantageNotIdol) {
+          type = "advantage";
+        } else if (mentionsIdol && !mentionsAdvantage) {
+          type = "idol";
+        } else if (mentionsAdvantage) {
+          type = "advantage";
+        } else if (mentionsIdol) {
+          type = "idol";
+        }
+
+        if (!type) return { type: null, action: null };
+
+        let action: "gain" | "play" | "lose" | null = null;
+        if (k.includes("gain") || k.includes("found") || k.includes("find")) {
+          action = "gain";
+        } else if (k.includes("play") || k.includes("used") || k.includes("use")) {
+          action = "play";
+        } else if (k.includes("kicked-off") || n.includes("kicked off")) {
+          action = "lose";
+        } else if (k.includes("gives") || n.includes("gives")) {
+          action = "lose";
+        }
+        return { type, action };
       };
 
       const idolWatch = contestants
         .filter(c => !c.eliminated)
         .map(c => {
           const cEvents = allEvents.filter(e => e.contestantId === c.id);
-          const ek = (e: typeof cEvents[0]) => e.eventKey || "";
-          const en = (e: typeof cEvents[0]) => e.eventName || "";
 
-          const idolsGained = cEvents.filter(e => isIdol(ek(e), en(e)) && isGain(ek(e), en(e))).length;
-          const idolsPlayed = cEvents.filter(e => isIdol(ek(e), en(e)) && isPlay(ek(e), en(e))).length;
-          const advantagesGained = cEvents.filter(e => isAdvantage(ek(e), en(e)) && !isIdol(ek(e), en(e)) && isGain(ek(e), en(e))).length;
-          const advantagesPlayed = cEvents.filter(e => isAdvantage(ek(e), en(e)) && !isIdol(ek(e), en(e)) && isPlay(ek(e), en(e))).length;
+          let idolsGained = 0, idolsUsed = 0, advantagesGained = 0, advantagesUsed = 0;
+          for (const ev of cEvents) {
+            const { type, action } = classifyEvent(ev.eventKey || "", ev.eventName || "");
+            if (type === "idol" && action === "gain") idolsGained++;
+            if (type === "idol" && (action === "play" || action === "lose")) idolsUsed++;
+            if (type === "advantage" && action === "gain") advantagesGained++;
+            if (type === "advantage" && (action === "play" || action === "lose")) advantagesUsed++;
+          }
 
-          const unplayedIdols = idolsGained - idolsPlayed;
-          const unplayedAdvantages = advantagesGained - advantagesPlayed;
+          const unplayedIdols = idolsGained - idolsUsed;
+          const unplayedAdvantages = advantagesGained - advantagesUsed;
 
           if (unplayedIdols <= 0 && unplayedAdvantages <= 0) return null;
           const tribe = tribesList.find(t => t.id === c.tribeId);
