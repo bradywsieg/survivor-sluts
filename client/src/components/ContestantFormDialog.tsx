@@ -79,8 +79,6 @@ export default function ContestantFormDialog({
     }
   };
 
-  const selectedTribe = tribes.find(t => t.id.toString() === tribeId);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -167,15 +165,6 @@ export default function ContestantFormDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {selectedTribe && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: selectedTribe.color }}
-                  />
-                  {selectedTribe.name}
-                </div>
-              )}
             </div>
           )}
 

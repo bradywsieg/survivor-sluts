@@ -715,20 +715,23 @@ export async function registerRoutes(
           .map(s => ({ contestantId: s.contestantId, points: s.points }));
       });
 
-      const idolAdvantageKeys = [
-        "found-hidden-immunity-idol", "found-advantage", "gained-an-advantage",
-        "played-hidden-immunity-idol", "played-advantage", "used-advantage",
-        "idol-found", "advantage-found", "idol-played", "advantage-played"
-      ];
-      const gainKeys = idolAdvantageKeys.filter(k => k.includes("found") || k.includes("gained"));
-      const playKeys = idolAdvantageKeys.filter(k => k.includes("played") || k.includes("used"));
+      const isGainKey = (key: string) => {
+        const k = key.toLowerCase();
+        return (k.includes("idol") || k.includes("advantage")) &&
+          (k.includes("gain") || k.includes("found") || k.includes("find"));
+      };
+      const isPlayKey = (key: string) => {
+        const k = key.toLowerCase();
+        return (k.includes("idol") || k.includes("advantage")) &&
+          (k.includes("play") || k.includes("used") || k.includes("use"));
+      };
 
       const idolWatch = contestants
         .filter(c => !c.eliminated)
         .map(c => {
           const cEvents = allEvents.filter(e => e.contestantId === c.id);
-          const gained = cEvents.filter(e => e.eventKey && gainKeys.includes(e.eventKey));
-          const played = cEvents.filter(e => e.eventKey && playKeys.includes(e.eventKey));
+          const gained = cEvents.filter(e => (e.eventKey && isGainKey(e.eventKey)) || (e.eventName && isGainKey(e.eventName)));
+          const played = cEvents.filter(e => (e.eventKey && isPlayKey(e.eventKey)) || (e.eventName && isPlayKey(e.eventName)));
           const unplayed = gained.length - played.length;
           if (unplayed <= 0) return null;
           const tribe = tribesList.find(t => t.id === c.tribeId);
