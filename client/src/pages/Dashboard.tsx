@@ -24,7 +24,8 @@ interface IdolWatchItem {
   imageUrl?: string | null;
   tribeColor?: string | null;
   tribeName?: string | null;
-  unplayedCount: number;
+  unplayedIdols: number;
+  unplayedAdvantages: number;
 }
 
 interface DashboardData {
@@ -162,10 +163,17 @@ export default function Dashboard() {
                       </Avatar>
                       <div className="min-w-0">
                         <span className="font-medium text-sm block truncate">{item.name}</span>
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <Badge variant="secondary" className="text-xs">
-                            {item.unplayedCount} unplayed
-                          </Badge>
+                        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                          {item.unplayedIdols > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {item.unplayedIdols} unplayed {item.unplayedIdols === 1 ? "idol" : "idols"}
+                            </Badge>
+                          )}
+                          {item.unplayedAdvantages > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {item.unplayedAdvantages} unplayed {item.unplayedAdvantages === 1 ? "advantage" : "advantages"}
+                            </Badge>
+                          )}
                           {item.tribeName && (
                             <span className="text-xs text-muted-foreground flex items-center gap-1">
                               <span

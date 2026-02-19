@@ -715,25 +715,39 @@ export async function registerRoutes(
           .map(s => ({ contestantId: s.contestantId, points: s.points }));
       });
 
-      const isGainKey = (key: string) => {
-        const k = key.toLowerCase();
-        return (k.includes("idol") || k.includes("advantage")) &&
-          (k.includes("gain") || k.includes("found") || k.includes("find"));
+      const isIdol = (key: string, name: string) => {
+        const text = `${key} ${name}`.toLowerCase();
+        return text.includes("idol");
       };
-      const isPlayKey = (key: string) => {
-        const k = key.toLowerCase();
-        return (k.includes("idol") || k.includes("advantage")) &&
-          (k.includes("play") || k.includes("used") || k.includes("use"));
+      const isAdvantage = (key: string, name: string) => {
+        const text = `${key} ${name}`.toLowerCase();
+        return text.includes("advantage");
+      };
+      const isGain = (key: string, name: string) => {
+        const text = `${key} ${name}`.toLowerCase();
+        return text.includes("gain") || text.includes("found") || text.includes("find");
+      };
+      const isPlay = (key: string, name: string) => {
+        const text = `${key} ${name}`.toLowerCase();
+        return text.includes("play") || text.includes("used") || text.includes("use");
       };
 
       const idolWatch = contestants
         .filter(c => !c.eliminated)
         .map(c => {
           const cEvents = allEvents.filter(e => e.contestantId === c.id);
-          const gained = cEvents.filter(e => (e.eventKey && isGainKey(e.eventKey)) || (e.eventName && isGainKey(e.eventName)));
-          const played = cEvents.filter(e => (e.eventKey && isPlayKey(e.eventKey)) || (e.eventName && isPlayKey(e.eventName)));
-          const unplayed = gained.length - played.length;
-          if (unplayed <= 0) return null;
+          const ek = (e: typeof cEvents[0]) => e.eventKey || "";
+          const en = (e: typeof cEvents[0]) => e.eventName || "";
+
+          const idolsGained = cEvents.filter(e => isIdol(ek(e), en(e)) && isGain(ek(e), en(e))).length;
+          const idolsPlayed = cEvents.filter(e => isIdol(ek(e), en(e)) && isPlay(ek(e), en(e))).length;
+          const advantagesGained = cEvents.filter(e => isAdvantage(ek(e), en(e)) && !isIdol(ek(e), en(e)) && isGain(ek(e), en(e))).length;
+          const advantagesPlayed = cEvents.filter(e => isAdvantage(ek(e), en(e)) && !isIdol(ek(e), en(e)) && isPlay(ek(e), en(e))).length;
+
+          const unplayedIdols = idolsGained - idolsPlayed;
+          const unplayedAdvantages = advantagesGained - advantagesPlayed;
+
+          if (unplayedIdols <= 0 && unplayedAdvantages <= 0) return null;
           const tribe = tribesList.find(t => t.id === c.tribeId);
           return {
             contestantId: c.id,
@@ -741,7 +755,8 @@ export async function registerRoutes(
             imageUrl: c.imageUrl,
             tribeColor: tribe?.color || null,
             tribeName: tribe?.name || null,
-            unplayedCount: unplayed,
+            unplayedIdols: Math.max(0, unplayedIdols),
+            unplayedAdvantages: Math.max(0, unplayedAdvantages),
           };
         })
         .filter(Boolean);
