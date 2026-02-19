@@ -3,12 +3,6 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTeamSchema, insertContestantSchema, insertWeekSchema, insertSeasonSchema } from "@shared/schema";
 import { z } from "zod";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const ADMIN_PIN = "1911";
 
@@ -20,56 +14,50 @@ function requirePin(req: Request, res: Response, next: NextFunction) {
   return res.status(401).json({ error: "Invalid PIN" });
 }
 
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
-}
-
-function parseCSVEvents(): { eventKey: string; eventName: string; points: number }[] {
-  const csvPath = path.resolve(__dirname, "data", "PointValues_Survivor.csv");
-  if (!fs.existsSync(csvPath)) return [];
-  const raw = fs.readFileSync(csvPath, "utf-8");
-  const lines = raw.split("\n").slice(1);
-  const events: { eventKey: string; eventName: string; points: number }[] = [];
-  const usedKeys = new Set<string>();
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const match = trimmed.match(/^"?([^",]+(?:,[^"]*)?)"?\s*,\s*(-?\d+)/);
-    if (!match) {
-      const parts = trimmed.split(",");
-      if (parts.length >= 2) {
-        const eventName = parts[0].replace(/^"|"$/g, "").trim();
-        const points = parseInt(parts[1]);
-        if (eventName && !isNaN(points)) {
-          let key = slugify(eventName);
-          if (!key) continue;
-          while (usedKeys.has(key)) { key += "-2"; }
-          usedKeys.add(key);
-          events.push({ eventKey: key, eventName, points });
-        }
-      }
-      continue;
-    }
-    const eventName = match[1].replace(/^"|"$/g, "").trim();
-    const points = parseInt(match[2]);
-    if (eventName && !isNaN(points)) {
-      let key = slugify(eventName);
-      if (!key) continue;
-      while (usedKeys.has(key)) { key += "-2"; }
-      usedKeys.add(key);
-      events.push({ eventKey: key, eventName, points });
-    }
-  }
-  return events;
-}
-
-const defaultEvents = parseCSVEvents();
+const defaultEvents: { eventKey: string; eventName: string; points: number }[] = [
+  { eventKey: "1st-place", eventName: "1st Place", points: 100 },
+  { eventKey: "2nd-place", eventName: "2nd Place", points: 60 },
+  { eventKey: "3rd-place", eventName: "3rd Place", points: 60 },
+  { eventKey: "4th-place", eventName: "4th Place", points: 40 },
+  { eventKey: "5th-place", eventName: "5th Place", points: 40 },
+  { eventKey: "6th-place", eventName: "6th Place", points: 30 },
+  { eventKey: "7th-place", eventName: "7th Place", points: 20 },
+  { eventKey: "8th-place", eventName: "8th Place", points: 20 },
+  { eventKey: "9th-place", eventName: "9th Place", points: 15 },
+  { eventKey: "10th-place", eventName: "10th Place", points: 15 },
+  { eventKey: "gains-any-advantage-has-to-be-activated-other-than-idol", eventName: "Gains any advantage (has to be activated) other than idol", points: 10 },
+  { eventKey: "gains-idol-has-to-be-activated", eventName: "Gains idol (has to be activated)", points: 10 },
+  { eventKey: "exits-due-to-healthinjury-before-merge", eventName: "Exits due to health/injury before merge", points: -10 },
+  { eventKey: "exits-voluntarily", eventName: "Exits voluntarily", points: -25 },
+  { eventKey: "kicked-off-with-idol", eventName: "Kicked off with idol", points: -10 },
+  { eventKey: "places-fake-idol", eventName: "Places fake idol", points: 10 },
+  { eventKey: "plays-fake-idol", eventName: "Plays fake idol", points: -5 },
+  { eventKey: "someone-else-plays-your-fake-idol", eventName: "Someone else plays your fake idol", points: 15 },
+  { eventKey: "wins-first-individual-immunity-challenge", eventName: "Wins first individual immunity challenge", points: 15 },
+  { eventKey: "wins-2nd-individual-immunity-challenge", eventName: "Wins 2nd individual immunity challenge", points: 10 },
+  { eventKey: "wins-3rd-individual-immunity-challenge", eventName: "Wins 3rd individual immunity challenge", points: 10 },
+  { eventKey: "wins-final-individual-immunity-challenge", eventName: "Wins final individual immunity challenge", points: 15 },
+  { eventKey: "wins-other-individual-immunity-challenge", eventName: "Wins other individual immunity challenge", points: 10 },
+  { eventKey: "wins-mergatory-individual-immunity-challenge", eventName: "Wins Mergatory Individual Immunity Challenge", points: 10 },
+  { eventKey: "gives-immunity-either-idol-or-individual-immunity-necklace-away", eventName: "Gives immunity (either idol or individual immunity necklace) away", points: 15 },
+  { eventKey: "plays-idol-and-person-it-is-played-for-gets-zero-votes-including-self", eventName: "Plays idol and person it is played for gets zero votes (including self)", points: -5 },
+  { eventKey: "advances-after-being-involved-in-tie-at-tribal-on-revote", eventName: "Advances after being involved in tie at tribal on revote", points: 5 },
+  { eventKey: "is-eliminated-after-tie-at-tribal", eventName: "Is eliminated after tie at tribal", points: 5 },
+  { eventKey: "eliminated-by-rocks", eventName: "Eliminated by rocks", points: 10 },
+  { eventKey: "eliminated-in-fire-making-challenge", eventName: "Eliminated in fire making challenge", points: 5 },
+  { eventKey: "advances-in-fire-making-challenge", eventName: "Advances in fire making challenge", points: 10 },
+  { eventKey: "makes-it-to-merge", eventName: "Makes it to merge", points: 10 },
+  { eventKey: "on-winning-reward-challenge-team", eventName: "On winning reward challenge team", points: 5 },
+  { eventKey: "on-winning-immunity-challenge-team", eventName: "On winning immunity challenge team", points: 5 },
+  { eventKey: "picked-for-reward", eventName: "Picked for reward", points: 5 },
+  { eventKey: "goes-on-journey", eventName: "Goes on Journey", points: 5 },
+  { eventKey: "wins-journey", eventName: "Wins Journey", points: 5 },
+  { eventKey: "loses-journey", eventName: "Loses Journey", points: -5 },
+  { eventKey: "plays-shot-in-the-dark-successfully", eventName: "Plays shot in the dark successfully", points: 15 },
+  { eventKey: "plays-shot-in-the-dark-unsuccessfully", eventName: "Plays shot in the dark unsuccessfully", points: -5 },
+  { eventKey: "plays-idol-at-tribal", eventName: "Plays idol at tribal", points: 10 },
+  { eventKey: "plays-advantage-extra-vote-steal-vote-etc", eventName: "Plays advantage (extra vote, steal vote etc.)", points: 10 },
+];
 
 export async function registerRoutes(
   httpServer: Server,
