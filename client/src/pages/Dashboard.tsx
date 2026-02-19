@@ -136,16 +136,16 @@ export default function Dashboard() {
           )}
         </div>
 
-        {idolWatch.length > 0 && (
-          <div className="mt-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
-                <CardTitle className="flex items-center gap-2 text-2xl font-bold font-['Slackey'] tracking-wide">
-                  <Eye className="h-6 w-6 text-primary" />
-                  Idol & Advantage Watch
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+        <div className="mt-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
+              <CardTitle className="flex items-center gap-2 text-2xl font-bold font-['Slackey'] tracking-wide">
+                <Eye className="h-6 w-6 text-primary" />
+                Idol & Advantage Watch
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {idolWatch.length > 0 ? (
                 <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {idolWatch.map((item) => (
                     <div
@@ -180,10 +180,14 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              ) : (
+                <p className="text-center text-muted-foreground py-6" data-testid="idol-watch-empty">
+                  Currently there are no active idols or advantages
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
         
         <div className="mt-8">
           {contestantChartData.length > 0 ? (
