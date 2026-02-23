@@ -8,10 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Copy, Pencil, Trash2, CheckCircle, HelpCircle } from "lucide-react";
+import { Plus, Copy, Pencil, Trash2, CheckCircle, HelpCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { adminApiRequest } from "@/lib/adminApi";
+
+interface WeekWithDeadline {
+  id: number;
+  weekNumber: number;
+  bonusDeadline: string | null;
+}
 
 interface BonusQuestion {
   id: number;
@@ -69,12 +75,14 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
   const [questionOptions, setQuestionOptions] = useState("");
   const [correctAnswers, setCorrectAnswers] = useState<Record<number, string>>({});
   const [correctWagers, setCorrectWagers] = useState<Record<number, string>>({});
+  const [deadlineDate, setDeadlineDate] = useState("");
+  const [deadlineTime, setDeadlineTime] = useState("");
 
   useEffect(() => {
     if (weeks.length > 0 && !selectedWeekId) {
       setSelectedWeekId(weeks[weeks.length - 1].id.toString());
     }
-  }, [weeks]);
+  }, [weeks.length]);
 
   const { data: questions = [] } = useQuery<BonusQuestion[]>({
     queryKey: ["/api/admin/bonus/questions", { seasonId: selectedSeasonId, weekId: selectedWeekId }],
@@ -113,6 +121,32 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
     },
     enabled: !!selectedSeasonId && !!selectedWeekId && bonusSubTab === "grade",
   });
+
+  const { data: weekDetail } = useQuery<WeekWithDeadline>({
+    queryKey: ["/api/weeks", selectedWeekId],
+    queryFn: async () => {
+      const res = await fetch(`/api/weeks/${selectedWeekId}`);
+      if (!res.ok) throw new Error("Failed to fetch week");
+      return res.json();
+    },
+    enabled: !!selectedWeekId,
+  });
+
+  useEffect(() => {
+    if (weekDetail?.bonusDeadline) {
+      const dt = new Date(weekDetail.bonusDeadline);
+      const year = dt.getFullYear();
+      const month = String(dt.getMonth() + 1).padStart(2, "0");
+      const day = String(dt.getDate()).padStart(2, "0");
+      const hours = String(dt.getHours()).padStart(2, "0");
+      const mins = String(dt.getMinutes()).padStart(2, "0");
+      setDeadlineDate(`${year}-${month}-${day}`);
+      setDeadlineTime(`${hours}:${mins}`);
+    } else {
+      setDeadlineDate("");
+      setDeadlineTime("");
+    }
+  }, [weekDetail, selectedWeekId]);
 
   const activeContestants = contestants.filter(c => !c.eliminated);
 
@@ -191,6 +225,34 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
     },
     onError: () => toast({ title: "Error", description: "Failed to grade.", variant: "destructive" }),
   });
+
+  const saveDeadlineMutation = useMutation({
+    mutationFn: (deadline: string | null) =>
+      adminApiRequest("PATCH", "/api/admin/bonus/deadline", {
+        weekId: parseInt(selectedWeekId),
+        deadline,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/weeks", selectedWeekId] });
+      toast({ title: "Deadline Saved" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to save deadline.", variant: "destructive" }),
+  });
+
+  const handleSaveDeadline = () => {
+    if (deadlineDate && deadlineTime) {
+      const deadline = new Date(`${deadlineDate}T${deadlineTime}:00`).toISOString();
+      saveDeadlineMutation.mutate(deadline);
+    } else {
+      saveDeadlineMutation.mutate(null);
+    }
+  };
+
+  const handleClearDeadline = () => {
+    setDeadlineDate("");
+    setDeadlineTime("");
+    saveDeadlineMutation.mutate(null);
+  };
 
   const closeQuestionDialog = () => {
     setQuestionDialogOpen(false);
@@ -308,6 +370,56 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                   <Copy className="h-4 w-4" />
                   Copy Last Week Questions
                 </Button>
+              </div>
+
+              <div className="flex items-end gap-3 p-4 rounded-lg border bg-muted/50 flex-wrap">
+                <Clock className="h-5 w-5 text-muted-foreground mb-2" />
+                <div className="space-y-1">
+                  <Label htmlFor="deadline-date" className="text-sm font-medium">Submission Deadline</Label>
+                  <Input
+                    id="deadline-date"
+                    type="date"
+                    value={deadlineDate}
+                    onChange={(e) => setDeadlineDate(e.target.value)}
+                    className="w-40"
+                    data-testid="input-deadline-date"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="deadline-time" className="text-sm font-medium">Time</Label>
+                  <Input
+                    id="deadline-time"
+                    type="time"
+                    value={deadlineTime}
+                    onChange={(e) => setDeadlineTime(e.target.value)}
+                    className="w-32"
+                    data-testid="input-deadline-time"
+                  />
+                </div>
+                <Button
+                  onClick={handleSaveDeadline}
+                  disabled={saveDeadlineMutation.isPending}
+                  size="sm"
+                  data-testid="button-save-deadline"
+                >
+                  Save Deadline
+                </Button>
+                {weekDetail?.bonusDeadline && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClearDeadline}
+                    disabled={saveDeadlineMutation.isPending}
+                    data-testid="button-clear-deadline"
+                  >
+                    Clear
+                  </Button>
+                )}
+                {weekDetail?.bonusDeadline && (
+                  <Badge variant="secondary" className="ml-auto" data-testid="badge-current-deadline">
+                    Current: {new Date(weekDetail.bonusDeadline).toLocaleString()}
+                  </Badge>
+                )}
               </div>
 
               {questions.length === 0 ? (

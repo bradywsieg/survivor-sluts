@@ -49,6 +49,7 @@ export interface IStorage {
   getWeek(id: number): Promise<Week | undefined>;
   getWeekByNumber(weekNumber: number, seasonId?: number): Promise<Week | undefined>;
   createWeek(week: InsertWeek): Promise<Week>;
+  updateWeekDeadline(weekId: number, deadline: Date | null): Promise<Week | undefined>;
   deleteWeek(id: number): Promise<boolean>;
 
   getContestantScores(): Promise<ContestantScore[]>;
@@ -231,6 +232,14 @@ export class DatabaseStorage implements IStorage {
   async createWeek(week: InsertWeek): Promise<Week> {
     const [newWeek] = await db.insert(weeks).values(week).returning();
     return newWeek;
+  }
+
+  async updateWeekDeadline(weekId: number, deadline: Date | null): Promise<Week | undefined> {
+    const [updated] = await db.update(weeks)
+      .set({ bonusDeadline: deadline })
+      .where(eq(weeks.id, weekId))
+      .returning();
+    return updated;
   }
 
   async deleteWeek(id: number): Promise<boolean> {

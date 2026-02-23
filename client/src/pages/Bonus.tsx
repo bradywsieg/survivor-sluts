@@ -111,13 +111,14 @@ export default function Bonus() {
     enabled: !!selectedSeasonId && !!selectedWeekId,
   });
 
-  const { data: deadlineStatus } = useQuery<{ open: boolean }>({
-    queryKey: ["/api/bonus/deadline-status"],
+  const { data: deadlineStatus } = useQuery<{ open: boolean; deadline: string | null }>({
+    queryKey: ["/api/bonus/deadline-status", selectedWeekId],
     queryFn: async () => {
-      const res = await fetch("/api/bonus/deadline-status");
+      const res = await fetch(`/api/bonus/deadline-status?weekId=${selectedWeekId}`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
+    enabled: !!selectedWeekId,
     refetchInterval: 60000,
   });
 
@@ -405,6 +406,17 @@ export default function Bonus() {
                   <p className="text-destructive font-medium text-center" data-testid="text-deadline-closed">
                     Sorry, bonus questions can no longer be submitted for this week's episode. Do better.
                   </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {isOpen && deadlineStatus?.deadline && (
+              <Card className="mb-6 border-amber-400">
+                <CardContent className="py-3 flex items-center justify-center gap-2 text-amber-700">
+                  <Lock className="h-4 w-4" />
+                  <span className="text-sm font-medium" data-testid="text-deadline-info">
+                    Deadline: {new Date(deadlineStatus.deadline).toLocaleString()}
+                  </span>
                 </CardContent>
               </Card>
             )}

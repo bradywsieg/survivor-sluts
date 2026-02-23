@@ -373,6 +373,17 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/weeks/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const week = await storage.getWeek(id);
+      if (!week) return res.status(404).json({ error: "Week not found" });
+      res.json(week);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch week" });
+    }
+  });
+
   app.post("/api/weeks", requirePin, async (req, res) => {
     try {
       const parsed = insertWeekSchema.parse(req.body);
@@ -631,19 +642,18 @@ export async function registerRoutes(
     }
   });
 
-  // Bonus deadline helper
-  function isBonusSubmissionOpen(): boolean {
-    const now = new Date();
-    const laTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
-    const day = laTime.getDay();
-    const hour = laTime.getHours();
-    if (day > 3) return false;
-    if (day === 3 && hour >= 20) return false;
-    return true;
-  }
-
-  app.get("/api/bonus/deadline-status", (_req, res) => {
-    res.json({ open: isBonusSubmissionOpen() });
+  app.get("/api/bonus/deadline-status", async (req, res) => {
+    try {
+      const weekId = parseInt(req.query.weekId as string);
+      if (!weekId) return res.json({ open: true, deadline: null });
+      const week = await storage.getWeek(weekId);
+      if (!week || !week.bonusDeadline) return res.json({ open: true, deadline: null });
+      const now = new Date();
+      const open = now < week.bonusDeadline;
+      res.json({ open, deadline: week.bonusDeadline.toISOString() });
+    } catch (error) {
+      res.json({ open: true, deadline: null });
+    }
   });
 
   // Team Secrets
@@ -712,13 +722,14 @@ export async function registerRoutes(
   // Bonus Submissions - Public
   app.post("/api/bonus/submit", async (req, res) => {
     try {
-      if (!isBonusSubmissionOpen()) {
-        return res.status(403).json({ error: "Sorry, bonus questions can no longer be submitted for this week's episode. Do better." });
-      }
       const { seasonId, weekId, teamId, passcode, answers } = req.body as {
         seasonId: number; weekId: number; teamId: number; passcode: string;
         answers: Record<string, any>;
       };
+      const week = await storage.getWeek(weekId);
+      if (week?.bonusDeadline && new Date() >= week.bonusDeadline) {
+        return res.status(403).json({ error: "Sorry, bonus questions can no longer be submitted for this week's episode. Do better." });
+      }
       const secret = await storage.getTeamSecret(teamId);
       if (!secret) return res.status(400).json({ error: "Team passcode not set" });
       const valid = await bcrypt.compare(passcode, secret.passcodeHash);
@@ -849,6 +860,18 @@ export async function registerRoutes(
       res.json({ success: true, count });
     } catch (error) {
       res.status(500).json({ error: "Failed to copy questions" });
+    }
+  });
+
+  app.patch("/api/admin/bonus/deadline", requirePin, async (req, res) => {
+    try {
+      const { weekId, deadline } = req.body as { weekId: number; deadline: string | null };
+      const deadlineDate = deadline ? new Date(deadline) : null;
+      const updated = await storage.updateWeekDeadline(weekId, deadlineDate);
+      if (!updated) return res.status(404).json({ error: "Week not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update deadline" });
     }
   });
 
