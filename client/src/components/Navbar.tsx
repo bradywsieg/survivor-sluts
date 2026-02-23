@@ -13,7 +13,7 @@ const navItems: NavItem[] = [
   { label: "Dashboard", href: "/", icon: Trophy },
   { label: "Teams", href: "/teams", icon: Users },
   { label: "Contestants", href: "/contestants", icon: UserCircle },
-  { label: "Bonus", href: "/bonus", icon: HelpCircle },
+  { label: "Bonus Questions", href: "/bonus", icon: HelpCircle },
   { label: "Rules", href: "/rules", icon: BookOpen },
   { label: "Admin", href: "/admin", icon: Shield },
 ];
