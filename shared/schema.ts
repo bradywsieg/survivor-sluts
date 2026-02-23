@@ -212,9 +212,10 @@ export const bonusQuestions = pgTable("bonus_questions", {
   weekId: integer("week_id").references(() => weeks.id).notNull(),
   questionText: text("question_text").notNull(),
   questionType: text("question_type").notNull(),
-  points: integer("points").default(0).notNull(),
+  points: integer("points").default(1).notNull(),
   optionsJson: text("options_json"),
   correctAnswer: text("correct_answer"),
+  isWager: boolean("is_wager").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
