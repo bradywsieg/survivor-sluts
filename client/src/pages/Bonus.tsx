@@ -632,6 +632,7 @@ export default function Bonus() {
                                   <tr className="border-b">
                                     <th className="text-left py-2 pr-4 whitespace-nowrap">Question</th>
                                     <th className="text-left py-2 pr-4 whitespace-nowrap">Your Answer</th>
+                                    <th className="text-left py-2 pr-4 whitespace-nowrap">Wager</th>
                                     <th className="text-left py-2 pr-4 whitespace-nowrap">Correct Answer</th>
                                     <th className="text-right py-2 whitespace-nowrap">Points</th>
                                   </tr>
@@ -646,9 +647,6 @@ export default function Bonus() {
                                       } else {
                                         displayAnswer = answer.answer || "-";
                                       }
-                                      if (q.isWager && answer.wager) {
-                                        displayAnswer += ` (wager: ${answer.wager})`;
-                                      }
                                     }
                                     const displayCorrect = q.correctAnswer
                                       ? q.questionType === "contestant"
@@ -660,6 +658,7 @@ export default function Bonus() {
                                       <tr key={q.id} className="border-b last:border-0">
                                         <td className="py-2 pr-4 whitespace-nowrap">{q.questionText}</td>
                                         <td className="py-2 pr-4 whitespace-nowrap">{displayAnswer}</td>
+                                        <td className="py-2 pr-4 whitespace-nowrap">{q.isWager && answer?.wager ? answer.wager : "n/a"}</td>
                                         <td className="py-2 pr-4 whitespace-nowrap">{displayCorrect}</td>
                                         <td className="py-2 text-right whitespace-nowrap">
                                           <Badge variant={result.points > 0 ? "default" : result.points < 0 ? "destructive" : "outline"}>
@@ -669,6 +668,23 @@ export default function Bonus() {
                                       </tr>
                                     );
                                   })}
+                                  <tr className="font-semibold border-t-2">
+                                    <td className="py-2 pr-4 whitespace-nowrap" colSpan={4}>Total Bonus Points</td>
+                                    <td className="py-2 text-right whitespace-nowrap">
+                                      {(() => {
+                                        const total = entry.questions.reduce((sum, q) => {
+                                          const answer = entry.answers[q.id.toString()];
+                                          const result = computeHistoryPoints(q, answer);
+                                          return sum + result.points;
+                                        }, 0);
+                                        return (
+                                          <Badge variant={total > 0 ? "default" : total < 0 ? "destructive" : "outline"}>
+                                            {total > 0 ? "+" : ""}{total}
+                                          </Badge>
+                                        );
+                                      })()}
+                                    </td>
+                                  </tr>
                                 </tbody>
                               </table>
                             </div>

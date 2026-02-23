@@ -545,8 +545,8 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                               value={correctAnswers[q.id] || ""}
                               onValueChange={(val) => setCorrectAnswers(prev => ({ ...prev, [q.id]: val }))}
                             >
-                              <SelectTrigger data-testid={`select-correct-${q.id}`}>
-                                <SelectValue placeholder="Answer" />
+                              <SelectTrigger className="bg-white" data-testid={`select-correct-${q.id}`}>
+                                <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="yes">Yes</SelectItem>
@@ -558,8 +558,8 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                               value={correctAnswers[q.id] || ""}
                               onValueChange={(val) => setCorrectAnswers(prev => ({ ...prev, [q.id]: val }))}
                             >
-                              <SelectTrigger data-testid={`select-correct-${q.id}`}>
-                                <SelectValue placeholder="Contestant" />
+                              <SelectTrigger className="bg-white" data-testid={`select-correct-${q.id}`}>
+                                <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 {activeContestants.map(c => (
@@ -572,8 +572,8 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                               value={correctAnswers[q.id] || ""}
                               onValueChange={(val) => setCorrectAnswers(prev => ({ ...prev, [q.id]: val }))}
                             >
-                              <SelectTrigger data-testid={`select-correct-${q.id}`}>
-                                <SelectValue placeholder="Option" />
+                              <SelectTrigger className="bg-white" data-testid={`select-correct-${q.id}`}>
+                                <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 {(q.optionsJson ? q.optionsJson.split(",").map(o => o.trim()) : []).map(opt => (
@@ -585,7 +585,7 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                             <Input
                               value={correctAnswers[q.id] || ""}
                               onChange={(e) => setCorrectAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-                              placeholder="Correct answer"
+                              className="bg-white"
                               data-testid={`input-correct-${q.id}`}
                             />
                           )}
