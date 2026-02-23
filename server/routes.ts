@@ -712,6 +712,7 @@ export async function registerRoutes(
       const sanitized = questions.map(q => ({
         ...q,
         correctAnswer: null,
+        isWager: q.isWager,
       }));
       res.json(sanitized);
     } catch (error) {
@@ -767,6 +768,7 @@ export async function registerRoutes(
             points: q.points,
             optionsJson: q.optionsJson,
             correctAnswer: q.correctAnswer,
+            isWager: q.isWager,
           })),
         };
       }));
@@ -854,6 +856,7 @@ export async function registerRoutes(
           points: q.points,
           optionsJson: q.optionsJson,
           correctAnswer: null,
+          isWager: q.isWager,
         });
         count++;
       }
@@ -875,13 +878,27 @@ export async function registerRoutes(
     }
   });
 
+  // Bulk save correct answers for all questions
+  app.post("/api/admin/bonus/save-answers", requirePin, async (req, res) => {
+    try {
+      const { answers } = req.body as { answers: { id: number; correctAnswer: string | null }[] };
+      if (!Array.isArray(answers)) return res.status(400).json({ error: "answers must be an array" });
+      for (const a of answers) {
+        if (typeof a.id !== "number") continue;
+        await storage.updateBonusQuestion(a.id, { correctAnswer: a.correctAnswer || null });
+      }
+      res.json({ success: true, saved: answers.length });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save answers" });
+    }
+  });
+
   // Admin grade / score bonus
   app.post("/api/admin/bonus/grade", requirePin, async (req, res) => {
     try {
       const { seasonId, weekId } = req.body as { seasonId: number; weekId: number };
       const questions = await storage.getBonusQuestions(seasonId, weekId);
       const submissions = await storage.getBonusSubmissionsByWeek(seasonId, weekId);
-      const contestants = await storage.getContestants(seasonId);
 
       for (const sub of submissions) {
         const answers: Record<string, any> = JSON.parse(sub.answersJson);
@@ -892,10 +909,14 @@ export async function registerRoutes(
           const answer = answers[q.id.toString()];
           if (!answer) continue;
 
-          if (q.questionType === "wager") {
+          if (q.isWager) {
             const wagerAmt = Math.min(Math.max(parseInt(answer.wager) || 0, 0), 50);
-            const userAnswer = (answer.answer || "").toString().toLowerCase().trim();
-            const correct = q.correctAnswer.toLowerCase().trim();
+            const userAnswer = q.questionType === "contestant"
+              ? (answer.answer || "").toString()
+              : (answer.answer || "").toString().toLowerCase().trim();
+            const correct = q.questionType === "contestant"
+              ? q.correctAnswer
+              : q.correctAnswer.toLowerCase().trim();
             if (userAnswer === correct) {
               totalBonus += wagerAmt;
             } else {
@@ -924,7 +945,7 @@ export async function registerRoutes(
     }
   });
 
-  // Admin get submissions for a week
+  // Admin get submissions for a week (basic list)
   app.get("/api/admin/bonus/submissions", requirePin, async (req, res) => {
     try {
       const seasonId = parseInt(req.query.seasonId as string);
@@ -934,6 +955,79 @@ export async function registerRoutes(
       res.json(submissions);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch submissions" });
+    }
+  });
+
+  // Admin detailed submissions view with answers and scoring
+  app.get("/api/admin/bonus/submissions-detail", requirePin, async (req, res) => {
+    try {
+      const seasonId = parseInt(req.query.seasonId as string);
+      const weekId = parseInt(req.query.weekId as string);
+      if (!seasonId || !weekId) return res.status(400).json({ error: "seasonId and weekId required" });
+      const questions = await storage.getBonusQuestions(seasonId, weekId);
+      const submissions = await storage.getBonusSubmissionsByWeek(seasonId, weekId);
+      const allTeams = await storage.getTeams(seasonId);
+      const allContestants = await storage.getContestants(seasonId);
+      const bonuses = await storage.getTeamBonusesByWeek(weekId);
+
+      const detail = submissions.map(sub => {
+        const team = allTeams.find(t => t.id === sub.teamId);
+        const answers: Record<string, any> = JSON.parse(sub.answersJson);
+        const bonus = bonuses.find(b => b.teamId === sub.teamId);
+
+        const questionResults = questions.map(q => {
+          const answer = answers[q.id.toString()];
+          let userAnswer = answer ? (answer.answer || "") : "";
+          let wagerAmount = answer?.wager ? parseInt(answer.wager) : null;
+          let pointsEarned = 0;
+          let isCorrect: boolean | null = null;
+
+          if (q.correctAnswer !== null && answer) {
+            if (q.isWager) {
+              const amt = Math.min(Math.max(wagerAmount || 0, 0), 50);
+              const ua = q.questionType === "contestant" ? userAnswer.toString() : userAnswer.toString().toLowerCase().trim();
+              const ca = q.questionType === "contestant" ? q.correctAnswer : q.correctAnswer.toLowerCase().trim();
+              isCorrect = ua === ca;
+              pointsEarned = isCorrect ? amt : -amt;
+            } else if (q.questionType === "contestant") {
+              isCorrect = userAnswer.toString() === q.correctAnswer;
+              pointsEarned = isCorrect ? q.points : 0;
+            } else {
+              isCorrect = userAnswer.toString().toLowerCase().trim() === q.correctAnswer.toLowerCase().trim();
+              pointsEarned = isCorrect ? q.points : 0;
+            }
+          }
+
+          if (q.questionType === "contestant" && userAnswer) {
+            const c = allContestants.find(c => c.id === parseInt(userAnswer));
+            userAnswer = c?.name || userAnswer;
+          }
+
+          return {
+            questionId: q.id,
+            questionText: q.questionText,
+            questionType: q.questionType,
+            points: q.points,
+            isWager: q.isWager,
+            userAnswer,
+            wagerAmount,
+            isCorrect,
+            pointsEarned,
+          };
+        });
+
+        return {
+          teamId: sub.teamId,
+          teamName: team?.name || `Team ${sub.teamId}`,
+          submittedAt: sub.submittedAt,
+          totalBonus: bonus?.bonus ?? null,
+          questionResults,
+        };
+      });
+
+      res.json(detail);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch submission details" });
     }
   });
 

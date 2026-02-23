@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import SeasonSelector from "@/components/SeasonSelector";
 import { useSeason } from "@/hooks/use-season";
-import { HelpCircle, Lock, Send, History, ChevronDown, ChevronUp } from "lucide-react";
+import { HelpCircle, Lock, Send, History, ChevronDown, ChevronUp, CheckCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,6 +24,7 @@ interface BonusQuestion {
   points: number;
   optionsJson: string | null;
   correctAnswer: string | null;
+  isWager: boolean;
 }
 
 interface Week {
@@ -55,7 +57,21 @@ interface HistoryEntry {
     points: number;
     optionsJson: string | null;
     correctAnswer: string | null;
+    isWager: boolean;
   }[];
+}
+
+function formatDeadlineDisplay(iso: string): string {
+  const dt = new Date(iso);
+  const month = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  const year = dt.getFullYear();
+  let hours = dt.getHours();
+  const mins = String(dt.getMinutes()).padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+  return `${month}/${day}/${year} at ${hours}:${mins} ${ampm} PST`;
 }
 
 export default function Bonus() {
@@ -146,7 +162,7 @@ export default function Bonus() {
     if (weeks.length > 0 && !selectedWeekId) {
       setSelectedWeekId(weeks[weeks.length - 1].id.toString());
     }
-  }, [weeks]);
+  }, [weeks.length]);
 
   useEffect(() => {
     setIsVerified(false);
@@ -244,14 +260,116 @@ export default function Bonus() {
 
   const computeHistoryPoints = (q: HistoryEntry["questions"][0], answer: any) => {
     if (!q.correctAnswer || !answer) return { points: 0, label: "Pending" };
-    if (q.questionType === "wager") {
+    if (q.isWager) {
       const wagerAmt = Math.min(Math.max(parseInt(answer.wager) || 0, 0), 50);
-      const correct = (answer.answer || "").toString().toLowerCase().trim() === q.correctAnswer.toLowerCase().trim();
-      return { points: correct ? wagerAmt : -wagerAmt, label: correct ? `+${wagerAmt}` : `-${wagerAmt}` };
+      const userAnswer = q.questionType === "contestant"
+        ? (answer.answer || "").toString()
+        : (answer.answer || "").toString().toLowerCase().trim();
+      const correct = q.questionType === "contestant"
+        ? q.correctAnswer
+        : q.correctAnswer.toLowerCase().trim();
+      const isCorrect = userAnswer === correct;
+      return { points: isCorrect ? wagerAmt : -wagerAmt, label: isCorrect ? `+${wagerAmt}` : `-${wagerAmt}` };
+    }
+    if (q.questionType === "contestant") {
+      const correct = (answer.answer || "").toString() === q.correctAnswer;
+      return { points: correct ? q.points : 0, label: correct ? `+${q.points}` : "0" };
     }
     const userAnswer = (answer.answer || "").toString().toLowerCase().trim();
     const correct = userAnswer === q.correctAnswer.toLowerCase().trim();
     return { points: correct ? q.points : 0, label: correct ? `+${q.points}` : "0" };
+  };
+
+  const renderQuestionInput = (q: BonusQuestion) => {
+    const baseInput = (() => {
+      switch (q.questionType) {
+        case "yesno":
+          return (
+            <RadioGroup
+              value={answers[q.id]?.answer || ""}
+              onValueChange={(val) => updateAnswer(q.id, { ...answers[q.id], answer: val })}
+              className="flex gap-4 ml-8"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="yes" id={`q${q.id}-yes`} data-testid={`radio-${q.id}-yes`} />
+                <Label htmlFor={`q${q.id}-yes`}>Yes</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="no" id={`q${q.id}-no`} data-testid={`radio-${q.id}-no`} />
+                <Label htmlFor={`q${q.id}-no`}>No</Label>
+              </div>
+            </RadioGroup>
+          );
+        case "multi":
+          return (
+            <RadioGroup
+              value={answers[q.id]?.answer || ""}
+              onValueChange={(val) => updateAnswer(q.id, { ...answers[q.id], answer: val })}
+              className="space-y-2 ml-8"
+            >
+              {(q.optionsJson ? q.optionsJson.split(",").map(o => o.trim()) : []).map(opt => (
+                <div key={opt} className="flex items-center space-x-2">
+                  <RadioGroupItem value={opt} id={`q${q.id}-${opt}`} data-testid={`radio-${q.id}-${opt}`} />
+                  <Label htmlFor={`q${q.id}-${opt}`}>{opt}</Label>
+                </div>
+              ))}
+            </RadioGroup>
+          );
+        case "number":
+          return (
+            <div className="ml-8">
+              <Input
+                type="number"
+                value={answers[q.id]?.answer || ""}
+                onChange={(e) => updateAnswer(q.id, { ...answers[q.id], answer: e.target.value })}
+                placeholder="Enter a number"
+                className="w-40"
+                data-testid={`input-number-${q.id}`}
+              />
+            </div>
+          );
+        case "contestant":
+          return (
+            <div className="ml-8">
+              <Select
+                value={answers[q.id]?.answer || ""}
+                onValueChange={(val) => updateAnswer(q.id, { ...answers[q.id], answer: val })}
+              >
+                <SelectTrigger className="w-64" data-testid={`select-contestant-${q.id}`}>
+                  <SelectValue placeholder="Select contestant" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeContestants.map(c => (
+                    <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          );
+        default:
+          return null;
+      }
+    })();
+
+    return (
+      <>
+        {baseInput}
+        {q.isWager && (
+          <div className="flex items-center gap-2 ml-8 mt-2">
+            <Label className="text-sm">Wager (0-50):</Label>
+            <Input
+              type="number"
+              min="0"
+              max="50"
+              value={answers[q.id]?.wager || ""}
+              onChange={(e) => updateAnswer(q.id, { ...answers[q.id], wager: e.target.value })}
+              className="w-24"
+              data-testid={`input-wager-${q.id}`}
+            />
+          </div>
+        )}
+      </>
+    );
   };
 
   return (
@@ -390,7 +508,7 @@ export default function Bonus() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-sm text-green-600">
-                  <Lock className="h-4 w-4" />
+                  <CheckCircle className="h-4 w-4" />
                   Verified
                 </div>
               )}
@@ -400,163 +518,85 @@ export default function Bonus() {
 
         {isVerified && selectedWeekId && (
           <>
-            {!isOpen && (
-              <Card className="mb-6 border-destructive">
-                <CardContent className="py-4">
-                  <p className="text-destructive font-medium text-center" data-testid="text-deadline-closed">
-                    Sorry, bonus questions can no longer be submitted for this week's episode. Do better.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="text-lg font-['Slackey'] tracking-wide">
+                  Week {weeks.find(w => w.id === parseInt(selectedWeekId))?.weekNumber} Questions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {!isOpen ? (
+                  <div className="py-6 text-center">
+                    <Clock className="h-8 w-8 text-destructive mx-auto mb-3" />
+                    <p className="text-destructive font-medium" data-testid="text-deadline-closed">
+                      Bonus questions can no longer be submitted for this week's episode.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {deadlineStatus?.deadline && (
+                      <Card className="border-amber-400 bg-amber-50/50">
+                        <CardContent className="py-3 flex items-center justify-center gap-2 text-amber-700">
+                          <Clock className="h-4 w-4" />
+                          <span className="text-sm font-medium" data-testid="text-deadline-info">
+                            Deadline: {formatDeadlineDisplay(deadlineStatus.deadline)}
+                          </span>
+                        </CardContent>
+                      </Card>
+                    )}
 
-            {isOpen && deadlineStatus?.deadline && (
-              <Card className="mb-6 border-amber-400">
-                <CardContent className="py-3 flex items-center justify-center gap-2 text-amber-700">
-                  <Lock className="h-4 w-4" />
-                  <span className="text-sm font-medium" data-testid="text-deadline-info">
-                    Deadline: {new Date(deadlineStatus.deadline).toLocaleString()}
-                  </span>
-                </CardContent>
-              </Card>
-            )}
-
-            {questions.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  No bonus questions available for this week yet.
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle className="text-lg font-['Slackey'] tracking-wide">
-                    Week {weeks.find(w => w.id === parseInt(selectedWeekId))?.weekNumber} Questions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {questions.map((q, idx) => (
-                    <div key={q.id} className="space-y-2 p-4 bg-muted/30 rounded-lg">
-                      <div className="flex items-start gap-2">
-                        <span className="font-bold text-primary min-w-[24px]">{idx + 1}.</span>
-                        <span className="font-medium">{q.questionText}</span>
-                        {q.questionType !== "wager" && (
-                          <Badge variant="outline" className="ml-auto shrink-0">{q.points} pts</Badge>
-                        )}
-                        {q.questionType === "wager" && (
-                          <Badge variant="outline" className="ml-auto shrink-0">Wager</Badge>
-                        )}
+                    {questions.length === 0 ? (
+                      <div className="py-8 text-center text-muted-foreground">
+                        No bonus questions available for this week yet.
                       </div>
-
-                      {q.questionType === "yesno" && (
-                        <RadioGroup
-                          value={answers[q.id]?.answer || ""}
-                          onValueChange={(val) => updateAnswer(q.id, { answer: val })}
-                          className="flex gap-4 ml-8"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="yes" id={`q${q.id}-yes`} data-testid={`radio-${q.id}-yes`} />
-                            <Label htmlFor={`q${q.id}-yes`}>Yes</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="no" id={`q${q.id}-no`} data-testid={`radio-${q.id}-no`} />
-                            <Label htmlFor={`q${q.id}-no`}>No</Label>
-                          </div>
-                        </RadioGroup>
-                      )}
-
-                      {q.questionType === "multi" && (
-                        <RadioGroup
-                          value={answers[q.id]?.answer || ""}
-                          onValueChange={(val) => updateAnswer(q.id, { answer: val })}
-                          className="space-y-2 ml-8"
-                        >
-                          {(q.optionsJson ? q.optionsJson.split(",").map(o => o.trim()) : []).map(opt => (
-                            <div key={opt} className="flex items-center space-x-2">
-                              <RadioGroupItem value={opt} id={`q${q.id}-${opt}`} data-testid={`radio-${q.id}-${opt}`} />
-                              <Label htmlFor={`q${q.id}-${opt}`}>{opt}</Label>
+                    ) : (
+                      <>
+                        {questions.map((q, idx) => (
+                          <div key={q.id} className="space-y-2 p-4 bg-muted/30 rounded-lg">
+                            <div className="flex items-start gap-2">
+                              <span className="font-bold text-primary min-w-[24px]">{idx + 1}.</span>
+                              <span className="font-medium">{q.questionText}</span>
+                              <div className="ml-auto flex gap-1 shrink-0">
+                                {q.isWager ? (
+                                  <Badge variant="outline" className="bg-orange-100 text-orange-800">Wager</Badge>
+                                ) : (
+                                  <Badge variant="outline">{q.points} pts</Badge>
+                                )}
+                              </div>
                             </div>
-                          ))}
-                        </RadioGroup>
-                      )}
-
-                      {q.questionType === "number" && (
-                        <div className="ml-8">
-                          <Input
-                            type="number"
-                            value={answers[q.id]?.answer || ""}
-                            onChange={(e) => updateAnswer(q.id, { answer: e.target.value })}
-                            placeholder="Enter a number"
-                            className="w-40"
-                            data-testid={`input-number-${q.id}`}
-                          />
-                        </div>
-                      )}
-
-                      {q.questionType === "wager" && (
-                        <div className="ml-8 space-y-2">
-                          <RadioGroup
-                            value={answers[q.id]?.answer || ""}
-                            onValueChange={(val) => updateAnswer(q.id, { ...answers[q.id], answer: val })}
-                            className="flex gap-4"
-                          >
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="yes" id={`q${q.id}-wager-yes`} data-testid={`radio-${q.id}-wager-yes`} />
-                              <Label htmlFor={`q${q.id}-wager-yes`}>Yes</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="no" id={`q${q.id}-wager-no`} data-testid={`radio-${q.id}-wager-no`} />
-                              <Label htmlFor={`q${q.id}-wager-no`}>No</Label>
-                            </div>
-                          </RadioGroup>
-                          <div className="flex items-center gap-2">
-                            <Label className="text-sm">Wager (0-50):</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              max="50"
-                              value={answers[q.id]?.wager || ""}
-                              onChange={(e) => updateAnswer(q.id, { ...answers[q.id], wager: e.target.value })}
-                              className="w-24"
-                              data-testid={`input-wager-${q.id}`}
-                            />
+                            {renderQuestionInput(q)}
                           </div>
-                        </div>
-                      )}
+                        ))}
 
-                      {q.questionType === "contestant" && (
-                        <div className="ml-8">
-                          <Select
-                            value={answers[q.id]?.answer || ""}
-                            onValueChange={(val) => updateAnswer(q.id, { answer: val })}
-                          >
-                            <SelectTrigger className="w-64" data-testid={`select-contestant-${q.id}`}>
-                              <SelectValue placeholder="Select contestant" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {activeContestants.map(c => (
-                                <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-
-                  <Button
-                    onClick={() => submitMutation.mutate()}
-                    disabled={!isOpen || submitMutation.isPending}
-                    className="w-full gap-2"
-                    size="lg"
-                    data-testid="button-submit-bonus"
-                  >
-                    <Send className="h-4 w-4" />
-                    {submitMutation.isPending ? "Submitting..." : "Submit Answers"}
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="w-full inline-block">
+                                <Button
+                                  onClick={() => submitMutation.mutate()}
+                                  disabled={!isOpen || submitMutation.isPending}
+                                  className="w-full gap-2"
+                                  size="lg"
+                                  data-testid="button-submit-bonus"
+                                >
+                                  <Send className="h-4 w-4" />
+                                  {submitMutation.isPending ? "Submitting..." : "Submit Answers"}
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            {!isOpen && (
+                              <TooltipContent>
+                                <p>Too slow! The submission deadline has passed for this episode.</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
+                      </>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
             {history.length > 0 && (
               <Card>
@@ -586,46 +626,52 @@ export default function Bonus() {
                         </button>
                         {isExpanded && (
                           <div className="border-t p-3">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="border-b">
-                                  <th className="text-left py-1 pr-2">Question</th>
-                                  <th className="text-left py-1 pr-2">Your Answer</th>
-                                  <th className="text-left py-1 pr-2">Correct Answer</th>
-                                  <th className="text-right py-1">Points</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {entry.questions.map((q) => {
-                                  const answer = entry.answers[q.id.toString()];
-                                  const displayAnswer = answer
-                                    ? q.questionType === "contestant"
-                                      ? getContestantName(answer.answer)
-                                      : q.questionType === "wager"
-                                      ? `${answer.answer} (wager: ${answer.wager})`
-                                      : answer.answer
-                                    : "-";
-                                  const displayCorrect = q.correctAnswer
-                                    ? q.questionType === "contestant"
-                                      ? getContestantName(q.correctAnswer)
-                                      : q.correctAnswer
-                                    : "Pending";
-                                  const result = computeHistoryPoints(q, answer);
-                                  return (
-                                    <tr key={q.id} className="border-b last:border-0">
-                                      <td className="py-2 pr-2">{q.questionText}</td>
-                                      <td className="py-2 pr-2">{displayAnswer}</td>
-                                      <td className="py-2 pr-2">{displayCorrect}</td>
-                                      <td className="py-2 text-right">
-                                        <Badge variant={result.points > 0 ? "default" : result.points < 0 ? "destructive" : "outline"}>
-                                          {result.label}
-                                        </Badge>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
+                            <div className="overflow-x-auto -mx-3 px-3">
+                              <table className="w-full text-sm min-w-[550px]">
+                                <thead>
+                                  <tr className="border-b">
+                                    <th className="text-left py-2 pr-4 whitespace-nowrap">Question</th>
+                                    <th className="text-left py-2 pr-4 whitespace-nowrap">Your Answer</th>
+                                    <th className="text-left py-2 pr-4 whitespace-nowrap">Correct Answer</th>
+                                    <th className="text-right py-2 whitespace-nowrap">Points</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {entry.questions.map((q) => {
+                                    const answer = entry.answers[q.id.toString()];
+                                    let displayAnswer = "-";
+                                    if (answer) {
+                                      if (q.questionType === "contestant") {
+                                        displayAnswer = getContestantName(answer.answer);
+                                      } else {
+                                        displayAnswer = answer.answer || "-";
+                                      }
+                                      if (q.isWager && answer.wager) {
+                                        displayAnswer += ` (wager: ${answer.wager})`;
+                                      }
+                                    }
+                                    const displayCorrect = q.correctAnswer
+                                      ? q.questionType === "contestant"
+                                        ? getContestantName(q.correctAnswer)
+                                        : q.correctAnswer
+                                      : "Pending";
+                                    const result = computeHistoryPoints(q, answer);
+                                    return (
+                                      <tr key={q.id} className="border-b last:border-0">
+                                        <td className="py-2 pr-4 whitespace-nowrap">{q.questionText}</td>
+                                        <td className="py-2 pr-4 whitespace-nowrap">{displayAnswer}</td>
+                                        <td className="py-2 pr-4 whitespace-nowrap">{displayCorrect}</td>
+                                        <td className="py-2 text-right whitespace-nowrap">
+                                          <Badge variant={result.points > 0 ? "default" : result.points < 0 ? "destructive" : "outline"}>
+                                            {result.label}
+                                          </Badge>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
                         )}
                       </div>

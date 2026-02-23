@@ -91,6 +91,12 @@ shared/           # Shared types and schema
 - Dashboard API returns tribes and idolWatch data
 - Seeded Season 50 with 3 tribes (Vatu/purple, Cila/orange, Kalo/teal) and contestant bios
 - PWA configured with custom app icon, manifest, and service worker
+- Weekly Bonus Questions system with 5 question types (yesno, multi, number, contestant) and wager as a toggle attribute on any question type
+- Bonus questions use passcode-based team authentication with bcrypt hashing
+- Admin bonus grading: bulk save all correct answers, expandable per-team submission viewer, score teams button
+- Admin-configurable per-week submission deadline (stored as timestamp on weeks table), formatted as mm/dd/yyyy at hh:mm AM/PM PST
+- Public bonus page: deadline enforcement hides questions when closed, checkmark icon for verified state, hover tooltip on disabled submit
+- Submission history table with horizontal scroll on mobile, no line breaks
 
 ## External Dependencies
 

@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Copy, Pencil, Trash2, CheckCircle, HelpCircle, Clock } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Copy, Pencil, Trash2, CheckCircle, HelpCircle, Clock, Save, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { adminApiRequest } from "@/lib/adminApi";
@@ -28,6 +29,7 @@ interface BonusQuestion {
   points: number;
   optionsJson: string | null;
   correctAnswer: string | null;
+  isWager: boolean;
 }
 
 interface Week {
@@ -55,13 +57,43 @@ interface BonusSubmission {
   submittedAt: string;
 }
 
+interface SubmissionDetail {
+  teamId: number;
+  teamName: string;
+  submittedAt: string;
+  totalBonus: number | null;
+  questionResults: {
+    questionId: number;
+    questionText: string;
+    questionType: string;
+    points: number;
+    isWager: boolean;
+    userAnswer: string;
+    wagerAmount: number | null;
+    isCorrect: boolean | null;
+    pointsEarned: number;
+  }[];
+}
+
 const QUESTION_TYPES = [
   { value: "yesno", label: "Yes / No" },
   { value: "multi", label: "Multiple Choice" },
   { value: "number", label: "Numerical" },
-  { value: "wager", label: "Wager" },
   { value: "contestant", label: "Contestant" },
 ];
+
+function formatDeadline(iso: string): string {
+  const dt = new Date(iso);
+  const month = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  const year = dt.getFullYear();
+  let hours = dt.getHours();
+  const mins = String(dt.getMinutes()).padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+  return `${month}/${day}/${year} at ${hours}:${mins} ${ampm} PST`;
+}
 
 export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSeasonId: string; weeks: Week[] }) {
   const { toast } = useToast();
@@ -71,12 +103,13 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
   const [editingQuestion, setEditingQuestion] = useState<BonusQuestion | null>(null);
   const [questionText, setQuestionText] = useState("");
   const [questionType, setQuestionType] = useState("yesno");
-  const [questionPoints, setQuestionPoints] = useState("10");
+  const [questionPoints, setQuestionPoints] = useState("1");
   const [questionOptions, setQuestionOptions] = useState("");
+  const [questionIsWager, setQuestionIsWager] = useState(false);
   const [correctAnswers, setCorrectAnswers] = useState<Record<number, string>>({});
-  const [correctWagers, setCorrectWagers] = useState<Record<number, string>>({});
   const [deadlineDate, setDeadlineDate] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("");
+  const [expandedTeams, setExpandedTeams] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     if (weeks.length > 0 && !selectedWeekId) {
@@ -113,10 +146,10 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
     enabled: !!selectedSeasonId,
   });
 
-  const { data: submissions = [] } = useQuery<BonusSubmission[]>({
-    queryKey: ["/api/admin/bonus/submissions", { seasonId: selectedSeasonId, weekId: selectedWeekId }],
+  const { data: submissionDetails = [] } = useQuery<SubmissionDetail[]>({
+    queryKey: ["/api/admin/bonus/submissions-detail", { seasonId: selectedSeasonId, weekId: selectedWeekId }],
     queryFn: async () => {
-      const res = await adminApiRequest("GET", `/api/admin/bonus/submissions?seasonId=${selectedSeasonId}&weekId=${selectedWeekId}`);
+      const res = await adminApiRequest("GET", `/api/admin/bonus/submissions-detail?seasonId=${selectedSeasonId}&weekId=${selectedWeekId}`);
       return res.json();
     },
     enabled: !!selectedSeasonId && !!selectedWeekId && bonusSubTab === "grade",
@@ -202,14 +235,15 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
     },
   });
 
-  const saveCorrectAnswerMutation = useMutation({
-    mutationFn: ({ id, correctAnswer }: { id: number; correctAnswer: string }) =>
-      adminApiRequest("PATCH", `/api/admin/bonus/questions/${id}`, { correctAnswer }),
+  const bulkSaveAnswersMutation = useMutation({
+    mutationFn: (answers: { id: number; correctAnswer: string }[]) =>
+      adminApiRequest("POST", "/api/admin/bonus/save-answers", { answers }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/bonus/questions"] });
-      toast({ title: "Answer Saved" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/bonus/submissions-detail"] });
+      toast({ title: "All Answers Saved" });
     },
-    onError: () => toast({ title: "Error", description: "Failed to save answer.", variant: "destructive" }),
+    onError: () => toast({ title: "Error", description: "Failed to save answers.", variant: "destructive" }),
   });
 
   const gradeMutation = useMutation({
@@ -221,6 +255,8 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/bonuses"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/bonus/submissions-detail"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bonus/history"] });
       toast({ title: "Graded!", description: `Scored ${data.teamsScored} teams` });
     },
     onError: () => toast({ title: "Error", description: "Failed to grade.", variant: "destructive" }),
@@ -259,16 +295,18 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
     setEditingQuestion(null);
     setQuestionText("");
     setQuestionType("yesno");
-    setQuestionPoints("10");
+    setQuestionPoints("1");
     setQuestionOptions("");
+    setQuestionIsWager(false);
   };
 
   const openCreateQuestion = () => {
     setEditingQuestion(null);
     setQuestionText("");
     setQuestionType("yesno");
-    setQuestionPoints("10");
+    setQuestionPoints("1");
     setQuestionOptions("");
+    setQuestionIsWager(false);
     setQuestionDialogOpen(true);
   };
 
@@ -278,6 +316,7 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
     setQuestionType(q.questionType);
     setQuestionPoints(q.points.toString());
     setQuestionOptions(q.optionsJson || "");
+    setQuestionIsWager(q.isWager);
     setQuestionDialogOpen(true);
   };
 
@@ -289,8 +328,9 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
       weekId: parseInt(selectedWeekId),
       questionText: questionText.trim(),
       questionType,
-      points: parseInt(questionPoints) || 0,
+      points: parseInt(questionPoints) || 1,
       optionsJson: questionType === "multi" ? questionOptions : null,
+      isWager: questionIsWager,
     };
     if (editingQuestion) {
       updateQuestionMutation.mutate({ id: editingQuestion.id, data });
@@ -299,12 +339,22 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
     }
   };
 
+  const handleBulkSave = () => {
+    const answersToSave = Object.entries(correctAnswers)
+      .filter(([_, val]) => val && val.trim())
+      .map(([id, correctAnswer]) => ({ id: parseInt(id), correctAnswer }));
+    if (answersToSave.length === 0) {
+      toast({ title: "No Answers", description: "Enter at least one correct answer to save.", variant: "destructive" });
+      return;
+    }
+    bulkSaveAnswersMutation.mutate(answersToSave);
+  };
+
   const getTypeBadgeColor = (type: string) => {
     switch (type) {
       case "yesno": return "bg-blue-100 text-blue-800";
       case "multi": return "bg-purple-100 text-purple-800";
       case "number": return "bg-green-100 text-green-800";
-      case "wager": return "bg-orange-100 text-orange-800";
       case "contestant": return "bg-teal-100 text-teal-800";
       default: return "";
     }
@@ -417,7 +467,7 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                 )}
                 {weekDetail?.bonusDeadline && (
                   <Badge variant="secondary" className="ml-auto" data-testid="badge-current-deadline">
-                    Current: {new Date(weekDetail.bonusDeadline).toLocaleString()}
+                    Current Deadline: {formatDeadline(weekDetail.bonusDeadline)}
                   </Badge>
                 )}
               </div>
@@ -434,6 +484,7 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                       <TableHead>Question</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Points</TableHead>
+                      <TableHead>Wager</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -447,7 +498,12 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                             {QUESTION_TYPES.find(t => t.value === q.questionType)?.label || q.questionType}
                           </Badge>
                         </TableCell>
-                        <TableCell>{q.questionType === "wager" ? "Wager" : q.points}</TableCell>
+                        <TableCell>{q.points}</TableCell>
+                        <TableCell>
+                          {q.isWager && (
+                            <Badge className="bg-orange-100 text-orange-800" variant="outline">Wager</Badge>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
                             <Button size="icon" variant="ghost" onClick={() => openEditQuestion(q)} data-testid={`button-edit-question-${q.id}`}>
@@ -480,8 +536,11 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                       <div key={q.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                         <span className="font-medium text-sm min-w-[24px]">{idx + 1}.</span>
                         <span className="flex-1 text-sm">{q.questionText}</span>
+                        {q.isWager && (
+                          <Badge className="bg-orange-100 text-orange-800 shrink-0" variant="outline">Wager</Badge>
+                        )}
                         <div className="w-48">
-                          {q.questionType === "yesno" || q.questionType === "wager" ? (
+                          {q.questionType === "yesno" ? (
                             <Select
                               value={correctAnswers[q.id] || ""}
                               onValueChange={(val) => setCorrectAnswers(prev => ({ ...prev, [q.id]: val }))}
@@ -531,26 +590,25 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                             />
                           )}
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            if (correctAnswers[q.id]) {
-                              saveCorrectAnswerMutation.mutate({ id: q.id, correctAnswer: correctAnswers[q.id] });
-                            }
-                          }}
-                          disabled={!correctAnswers[q.id]}
-                          data-testid={`button-save-correct-${q.id}`}
-                        >
-                          Save
-                        </Button>
                       </div>
                     ))}
+
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        onClick={handleBulkSave}
+                        disabled={bulkSaveAnswersMutation.isPending}
+                        className="gap-2"
+                        data-testid="button-save-all-answers"
+                      >
+                        <Save className="h-4 w-4" />
+                        {bulkSaveAnswersMutation.isPending ? "Saving..." : "Save All Answers"}
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="border-t pt-4 mt-4">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold">Submissions ({submissions.length} teams)</h3>
+                      <h3 className="font-semibold">Submissions ({submissionDetails.length} teams)</h3>
                       <Button
                         onClick={() => gradeMutation.mutate()}
                         disabled={gradeMutation.isPending}
@@ -561,21 +619,70 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                         Score Teams
                       </Button>
                     </div>
-                    {submissions.length === 0 ? (
+                    {submissionDetails.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No submissions yet for this week.</p>
                     ) : (
                       <div className="space-y-2">
-                        {submissions.map(sub => {
-                          const team = teams.find(t => t.id === sub.teamId);
-                          return (
-                            <div key={sub.id} className="flex items-center gap-3 p-2 bg-muted/30 rounded">
-                              <Badge variant="outline">{team?.name || `Team ${sub.teamId}`}</Badge>
-                              <span className="text-xs text-muted-foreground">
-                                Submitted {new Date(sub.submittedAt).toLocaleString()}
-                              </span>
-                            </div>
-                          );
-                        })}
+                        {submissionDetails.map(sub => (
+                          <div key={sub.teamId} className="border rounded-lg overflow-hidden">
+                            <button
+                              className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
+                              onClick={() => setExpandedTeams(prev => ({ ...prev, [sub.teamId]: !prev[sub.teamId] }))}
+                              data-testid={`button-expand-submission-${sub.teamId}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Badge variant="outline">{sub.teamName}</Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  Submitted {new Date(sub.submittedAt).toLocaleString()}
+                                </span>
+                                {sub.totalBonus !== null && (
+                                  <Badge variant={sub.totalBonus > 0 ? "default" : sub.totalBonus < 0 ? "destructive" : "secondary"}>
+                                    {sub.totalBonus > 0 ? "+" : ""}{sub.totalBonus} pts
+                                  </Badge>
+                                )}
+                              </div>
+                              {expandedTeams[sub.teamId] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </button>
+                            {expandedTeams[sub.teamId] && (
+                              <div className="border-t p-3">
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm min-w-[500px]">
+                                    <thead>
+                                      <tr className="border-b">
+                                        <th className="text-left py-1 pr-4">#</th>
+                                        <th className="text-left py-1 pr-4">Question</th>
+                                        <th className="text-left py-1 pr-4">Answer</th>
+                                        <th className="text-left py-1 pr-4">Wager</th>
+                                        <th className="text-right py-1">Result</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {sub.questionResults.map((qr, idx) => {
+                                        return (
+                                          <tr key={qr.questionId} className="border-b last:border-0">
+                                            <td className="py-2 pr-4 whitespace-nowrap">{idx + 1}</td>
+                                            <td className="py-2 pr-4 whitespace-nowrap max-w-[200px] truncate">{qr.questionText}</td>
+                                            <td className="py-2 pr-4 whitespace-nowrap">{qr.userAnswer || "-"}</td>
+                                            <td className="py-2 pr-4 whitespace-nowrap">{qr.wagerAmount !== null ? qr.wagerAmount : "-"}</td>
+                                            <td className="py-2 text-right whitespace-nowrap">
+                                              {qr.isCorrect === null ? (
+                                                <Badge variant="outline">Pending</Badge>
+                                              ) : (
+                                                <Badge variant={qr.pointsEarned > 0 ? "default" : qr.pointsEarned < 0 ? "destructive" : "outline"}>
+                                                  {qr.pointsEarned > 0 ? "+" : ""}{qr.pointsEarned}
+                                                </Badge>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -617,18 +724,16 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                 </SelectContent>
               </Select>
             </div>
-            {questionType !== "wager" && (
-              <div className="space-y-2">
-                <Label htmlFor="questionPoints">Points</Label>
-                <Input
-                  id="questionPoints"
-                  type="number"
-                  value={questionPoints}
-                  onChange={(e) => setQuestionPoints(e.target.value)}
-                  data-testid="input-question-points"
-                />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="questionPoints">Points</Label>
+              <Input
+                id="questionPoints"
+                type="number"
+                value={questionPoints}
+                onChange={(e) => setQuestionPoints(e.target.value)}
+                data-testid="input-question-points"
+              />
+            </div>
             {questionType === "multi" && (
               <div className="space-y-2">
                 <Label htmlFor="questionOptions">Options (comma separated)</Label>
@@ -641,6 +746,18 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                 />
               </div>
             )}
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+              <Switch
+                id="questionIsWager"
+                checked={questionIsWager}
+                onCheckedChange={setQuestionIsWager}
+                data-testid="switch-question-wager"
+              />
+              <Label htmlFor="questionIsWager" className="cursor-pointer">
+                <span className="font-medium">Wager</span>
+                <p className="text-xs text-muted-foreground">Users can wager 0-50 points on their answer</p>
+              </Label>
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeQuestionDialog}>Cancel</Button>
               <Button
