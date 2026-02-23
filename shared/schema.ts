@@ -84,6 +84,7 @@ export const weeks = pgTable("weeks", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   weekNumber: integer("week_number").notNull(),
   seasonId: integer("season_id").references(() => seasons.id),
+  bonusDeadline: timestamp("bonus_deadline"),
 });
 
 export const weeksRelations = relations(weeks, ({ one, many }) => ({
