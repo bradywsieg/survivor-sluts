@@ -1,8 +1,9 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTeamSchema, insertContestantSchema, insertWeekSchema, insertSeasonSchema, insertTribeSchema } from "@shared/schema";
+import { insertTeamSchema, insertContestantSchema, insertWeekSchema, insertSeasonSchema, insertTribeSchema, insertBonusQuestionSchema } from "@shared/schema";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 
 const ADMIN_PIN = "1911";
 
@@ -627,6 +628,289 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to recalculate" });
+    }
+  });
+
+  // Bonus deadline helper
+  function isBonusSubmissionOpen(): boolean {
+    const now = new Date();
+    const laTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+    const day = laTime.getDay();
+    const hour = laTime.getHours();
+    if (day > 3) return false;
+    if (day === 3 && hour >= 20) return false;
+    return true;
+  }
+
+  app.get("/api/bonus/deadline-status", (_req, res) => {
+    res.json({ open: isBonusSubmissionOpen() });
+  });
+
+  // Team Secrets
+  app.post("/api/teams/:teamId/set-secret", async (req, res) => {
+    try {
+      const teamId = parseInt(req.params.teamId);
+      const { passcode, oldPasscode } = req.body as { passcode: string; oldPasscode?: string };
+      if (!passcode || passcode.length < 3) {
+        return res.status(400).json({ error: "Passcode must be at least 3 characters" });
+      }
+      const existing = await storage.getTeamSecret(teamId);
+      if (existing) {
+        if (!oldPasscode) return res.status(400).json({ error: "Current passcode required to reset" });
+        const valid = await bcrypt.compare(oldPasscode, existing.passcodeHash);
+        if (!valid) return res.status(401).json({ error: "Current passcode is incorrect" });
+      }
+      const hash = await bcrypt.hash(passcode, 10);
+      await storage.setTeamSecret(teamId, hash);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to set passcode:", error);
+      res.status(500).json({ error: "Failed to set passcode" });
+    }
+  });
+
+  app.post("/api/teams/:teamId/verify-secret", async (req, res) => {
+    try {
+      const teamId = parseInt(req.params.teamId);
+      const { passcode } = req.body as { passcode: string };
+      const secret = await storage.getTeamSecret(teamId);
+      if (!secret) return res.json({ verified: false, hasSecret: false });
+      const valid = await bcrypt.compare(passcode, secret.passcodeHash);
+      res.json({ verified: valid, hasSecret: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to verify passcode" });
+    }
+  });
+
+  app.get("/api/teams/:teamId/has-secret", async (req, res) => {
+    try {
+      const teamId = parseInt(req.params.teamId);
+      const secret = await storage.getTeamSecret(teamId);
+      res.json({ hasSecret: !!secret });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check secret" });
+    }
+  });
+
+  // Bonus Questions - Public read
+  app.get("/api/bonus/questions", async (req, res) => {
+    try {
+      const seasonId = parseInt(req.query.seasonId as string);
+      const weekId = parseInt(req.query.weekId as string);
+      if (!seasonId || !weekId) return res.status(400).json({ error: "seasonId and weekId required" });
+      const questions = await storage.getBonusQuestions(seasonId, weekId);
+      const sanitized = questions.map(q => ({
+        ...q,
+        correctAnswer: null,
+      }));
+      res.json(sanitized);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch questions" });
+    }
+  });
+
+  // Bonus Submissions - Public
+  app.post("/api/bonus/submit", async (req, res) => {
+    try {
+      if (!isBonusSubmissionOpen()) {
+        return res.status(403).json({ error: "Sorry, bonus questions can no longer be submitted for this week's episode. Do better." });
+      }
+      const { seasonId, weekId, teamId, passcode, answers } = req.body as {
+        seasonId: number; weekId: number; teamId: number; passcode: string;
+        answers: Record<string, any>;
+      };
+      const secret = await storage.getTeamSecret(teamId);
+      if (!secret) return res.status(400).json({ error: "Team passcode not set" });
+      const valid = await bcrypt.compare(passcode, secret.passcodeHash);
+      if (!valid) return res.status(401).json({ error: "Invalid passcode" });
+
+      const submission = await storage.upsertBonusSubmission({
+        seasonId, weekId, teamId, answersJson: JSON.stringify(answers),
+      });
+      res.json(submission);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to submit answers" });
+    }
+  });
+
+  // Team bonus history
+  app.get("/api/bonus/history/:teamId", async (req, res) => {
+    try {
+      const teamId = parseInt(req.params.teamId);
+      const seasonId = parseInt(req.query.seasonId as string);
+      if (!seasonId) return res.status(400).json({ error: "seasonId required" });
+      const submissions = await storage.getBonusSubmissionsByTeam(teamId, seasonId);
+      const allWeeks = await storage.getWeeks(seasonId);
+      const history = await Promise.all(submissions.map(async (sub) => {
+        const questions = await storage.getBonusQuestions(sub.seasonId, sub.weekId);
+        const week = allWeeks.find(w => w.id === sub.weekId);
+        return {
+          weekId: sub.weekId,
+          weekNumber: week?.weekNumber,
+          submittedAt: sub.submittedAt,
+          answers: JSON.parse(sub.answersJson),
+          questions: questions.map(q => ({
+            id: q.id,
+            questionText: q.questionText,
+            questionType: q.questionType,
+            points: q.points,
+            optionsJson: q.optionsJson,
+            correctAnswer: q.correctAnswer,
+          })),
+        };
+      }));
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch history" });
+    }
+  });
+
+  // Admin Bonus Questions
+  app.get("/api/admin/bonus/questions", requirePin, async (req, res) => {
+    try {
+      const seasonId = parseInt(req.query.seasonId as string);
+      const weekId = parseInt(req.query.weekId as string);
+      if (!seasonId || !weekId) return res.status(400).json({ error: "seasonId and weekId required" });
+      const questions = await storage.getBonusQuestions(seasonId, weekId);
+      res.json(questions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch questions" });
+    }
+  });
+
+  app.post("/api/admin/bonus/questions", requirePin, async (req, res) => {
+    try {
+      const parsed = insertBonusQuestionSchema.parse(req.body);
+      const question = await storage.createBonusQuestion(parsed);
+      res.status(201).json(question);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to create question" });
+    }
+  });
+
+  app.patch("/api/admin/bonus/questions/:id", requirePin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updated = await storage.updateBonusQuestion(id, req.body);
+      if (!updated) return res.status(404).json({ error: "Question not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update question" });
+    }
+  });
+
+  app.delete("/api/admin/bonus/questions/:id", requirePin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteBonusQuestion(id);
+      if (!deleted) return res.status(404).json({ error: "Question not found" });
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete question" });
+    }
+  });
+
+  // Copy last week questions
+  app.post("/api/admin/bonus/:seasonId/:weekId/copy-last-week", requirePin, async (req, res) => {
+    try {
+      const seasonId = parseInt(req.params.seasonId);
+      const weekId = parseInt(req.params.weekId);
+
+      const existingQuestions = await storage.getBonusQuestions(seasonId, weekId);
+      if (existingQuestions.length > 0) {
+        return res.status(400).json({ error: "Questions already exist for this week" });
+      }
+
+      const allWeeks = await storage.getWeeks(seasonId);
+      const currentWeek = allWeeks.find(w => w.id === weekId);
+      if (!currentWeek) return res.status(404).json({ error: "Week not found" });
+
+      const prevWeek = allWeeks
+        .filter(w => w.weekNumber < currentWeek.weekNumber)
+        .sort((a, b) => b.weekNumber - a.weekNumber)[0];
+      if (!prevWeek) return res.status(404).json({ error: "No previous week found" });
+
+      const prevQuestions = await storage.getBonusQuestions(seasonId, prevWeek.id);
+      if (prevQuestions.length === 0) return res.status(404).json({ error: "No questions found in previous week" });
+
+      let count = 0;
+      for (const q of prevQuestions) {
+        await storage.createBonusQuestion({
+          seasonId, weekId,
+          questionText: q.questionText,
+          questionType: q.questionType,
+          points: q.points,
+          optionsJson: q.optionsJson,
+          correctAnswer: null,
+        });
+        count++;
+      }
+      res.json({ success: true, count });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to copy questions" });
+    }
+  });
+
+  // Admin grade / score bonus
+  app.post("/api/admin/bonus/grade", requirePin, async (req, res) => {
+    try {
+      const { seasonId, weekId } = req.body as { seasonId: number; weekId: number };
+      const questions = await storage.getBonusQuestions(seasonId, weekId);
+      const submissions = await storage.getBonusSubmissionsByWeek(seasonId, weekId);
+      const contestants = await storage.getContestants(seasonId);
+
+      for (const sub of submissions) {
+        const answers: Record<string, any> = JSON.parse(sub.answersJson);
+        let totalBonus = 0;
+
+        for (const q of questions) {
+          if (q.correctAnswer === null) continue;
+          const answer = answers[q.id.toString()];
+          if (!answer) continue;
+
+          if (q.questionType === "wager") {
+            const wagerAmt = Math.min(Math.max(parseInt(answer.wager) || 0, 0), 50);
+            const userAnswer = (answer.answer || "").toString().toLowerCase().trim();
+            const correct = q.correctAnswer.toLowerCase().trim();
+            if (userAnswer === correct) {
+              totalBonus += wagerAmt;
+            } else {
+              totalBonus -= wagerAmt;
+            }
+          } else if (q.questionType === "contestant") {
+            const userAnswer = (answer.answer || "").toString();
+            if (userAnswer === q.correctAnswer) {
+              totalBonus += q.points;
+            }
+          } else {
+            const userAnswer = (answer.answer || "").toString().toLowerCase().trim();
+            const correct = q.correctAnswer.toLowerCase().trim();
+            if (userAnswer === correct) {
+              totalBonus += q.points;
+            }
+          }
+        }
+
+        await storage.upsertTeamBonus({ teamId: sub.teamId, weekId, bonus: totalBonus });
+      }
+
+      res.json({ success: true, teamsScored: submissions.length });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to grade bonus" });
+    }
+  });
+
+  // Admin get submissions for a week
+  app.get("/api/admin/bonus/submissions", requirePin, async (req, res) => {
+    try {
+      const seasonId = parseInt(req.query.seasonId as string);
+      const weekId = parseInt(req.query.weekId as string);
+      if (!seasonId || !weekId) return res.status(400).json({ error: "seasonId and weekId required" });
+      const submissions = await storage.getBonusSubmissionsByWeek(seasonId, weekId);
+      res.json(submissions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch submissions" });
     }
   });
 

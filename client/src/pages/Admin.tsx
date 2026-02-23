@@ -12,11 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import SeasonSelector from "@/components/SeasonSelector";
 import PinGate from "@/components/PinGate";
 import { useSeason } from "@/hooks/use-season";
-import { Shield, Plus, X, Search, Calendar, Save, Zap, Tv, Palette, Pencil, Trash2 } from "lucide-react";
+import { Shield, Plus, X, Search, Calendar, Save, Zap, Tv, Palette, Pencil, Trash2, HelpCircle, Copy, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { adminApiRequest } from "@/lib/adminApi";
 import { Skeleton } from "@/components/ui/skeleton";
+import AdminBonusTab from "@/components/AdminBonusTab";
 
 interface Contestant {
   id: number;
@@ -84,7 +85,7 @@ function AdminContent() {
   const [customEventName, setCustomEventName] = useState("");
   const [customEventPoints, setCustomEventPoints] = useState("");
   const [editingPoints, setEditingPoints] = useState<Record<string, string>>({});
-  const [activeTab, setActiveTab] = useState<"scoring" | "settings" | "seasons" | "tribes">("scoring");
+  const [activeTab, setActiveTab] = useState<"scoring" | "settings" | "seasons" | "tribes" | "bonus">("scoring");
 
   const [seasonDialogOpen, setSeasonDialogOpen] = useState(false);
   const [editingSeason, setEditingSeason] = useState<Season | null>(null);
@@ -530,6 +531,14 @@ function AdminContent() {
           >
             <Palette className="h-4 w-4 mr-2" />
             Tribes
+          </Button>
+          <Button
+            variant={activeTab === "bonus" ? "default" : "outline"}
+            onClick={() => setActiveTab("bonus")}
+            data-testid="button-tab-bonus"
+          >
+            <HelpCircle className="h-4 w-4 mr-2" />
+            Bonus Questions
           </Button>
         </div>
 
@@ -990,6 +999,10 @@ function AdminContent() {
             )}
           </DialogContent>
         </Dialog>
+
+        {activeTab === "bonus" && selectedSeasonId && (
+          <AdminBonusTab selectedSeasonId={selectedSeasonId} weeks={weeks} />
+        )}
 
         <Dialog open={seasonDialogOpen} onOpenChange={(open) => { if (!open) closeSeasonDialog(); else setSeasonDialogOpen(open); }}>
           <DialogContent className="sm:max-w-md">

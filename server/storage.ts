@@ -1,6 +1,7 @@
 import { 
   seasons, teams, contestants, weeks, contestantScores, teamBonuses,
   seasonEventSettings, contestantEvents, tribes,
+  teamSecrets, bonusQuestions, bonusSubmissions,
   type Season, type InsertSeason,
   type Team, type InsertTeam,
   type Contestant, type InsertContestant,
@@ -9,10 +10,13 @@ import {
   type TeamBonus, type InsertTeamBonus,
   type SeasonEventSetting, type InsertSeasonEventSetting,
   type ContestantEvent, type InsertContestantEvent,
-  type Tribe, type InsertTribe
+  type Tribe, type InsertTribe,
+  type TeamSecret,
+  type BonusQuestion, type InsertBonusQuestion,
+  type BonusSubmission, type InsertBonusSubmission
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, lt } from "drizzle-orm";
 
 export interface IStorage {
   getSeasons(): Promise<Season[]>;
@@ -69,6 +73,20 @@ export interface IStorage {
 
   recalcScoresForWeek(seasonId: number, weekId: number): Promise<void>;
   recalcScoresForSeason(seasonId: number): Promise<void>;
+
+  getTeamSecret(teamId: number): Promise<TeamSecret | undefined>;
+  setTeamSecret(teamId: number, passcodeHash: string): Promise<TeamSecret>;
+
+  getBonusQuestions(seasonId: number, weekId: number): Promise<BonusQuestion[]>;
+  getBonusQuestion(id: number): Promise<BonusQuestion | undefined>;
+  createBonusQuestion(question: InsertBonusQuestion): Promise<BonusQuestion>;
+  updateBonusQuestion(id: number, question: Partial<InsertBonusQuestion>): Promise<BonusQuestion | undefined>;
+  deleteBonusQuestion(id: number): Promise<boolean>;
+
+  getBonusSubmission(seasonId: number, weekId: number, teamId: number): Promise<BonusSubmission | undefined>;
+  getBonusSubmissionsByWeek(seasonId: number, weekId: number): Promise<BonusSubmission[]>;
+  getBonusSubmissionsByTeam(teamId: number, seasonId: number): Promise<BonusSubmission[]>;
+  upsertBonusSubmission(submission: InsertBonusSubmission): Promise<BonusSubmission>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -396,6 +414,84 @@ export class DatabaseStorage implements IStorage {
     for (const week of seasonWeeks) {
       await this.recalcScoresForWeek(seasonId, week.id);
     }
+  }
+
+  async getTeamSecret(teamId: number): Promise<TeamSecret | undefined> {
+    const [secret] = await db.select().from(teamSecrets).where(eq(teamSecrets.teamId, teamId));
+    return secret;
+  }
+
+  async setTeamSecret(teamId: number, passcodeHash: string): Promise<TeamSecret> {
+    const existing = await this.getTeamSecret(teamId);
+    if (existing) {
+      const [updated] = await db.update(teamSecrets)
+        .set({ passcodeHash, updatedAt: new Date() })
+        .where(eq(teamSecrets.teamId, teamId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(teamSecrets).values({ teamId, passcodeHash }).returning();
+    return created;
+  }
+
+  async getBonusQuestions(seasonId: number, weekId: number): Promise<BonusQuestion[]> {
+    return await db.select().from(bonusQuestions)
+      .where(and(eq(bonusQuestions.seasonId, seasonId), eq(bonusQuestions.weekId, weekId)))
+      .orderBy(bonusQuestions.id);
+  }
+
+  async getBonusQuestion(id: number): Promise<BonusQuestion | undefined> {
+    const [q] = await db.select().from(bonusQuestions).where(eq(bonusQuestions.id, id));
+    return q;
+  }
+
+  async createBonusQuestion(question: InsertBonusQuestion): Promise<BonusQuestion> {
+    const [created] = await db.insert(bonusQuestions).values(question).returning();
+    return created;
+  }
+
+  async updateBonusQuestion(id: number, question: Partial<InsertBonusQuestion>): Promise<BonusQuestion | undefined> {
+    const [updated] = await db.update(bonusQuestions).set(question).where(eq(bonusQuestions.id, id)).returning();
+    return updated;
+  }
+
+  async deleteBonusQuestion(id: number): Promise<boolean> {
+    const result = await db.delete(bonusQuestions).where(eq(bonusQuestions.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getBonusSubmission(seasonId: number, weekId: number, teamId: number): Promise<BonusSubmission | undefined> {
+    const [sub] = await db.select().from(bonusSubmissions)
+      .where(and(
+        eq(bonusSubmissions.seasonId, seasonId),
+        eq(bonusSubmissions.weekId, weekId),
+        eq(bonusSubmissions.teamId, teamId)
+      ));
+    return sub;
+  }
+
+  async getBonusSubmissionsByWeek(seasonId: number, weekId: number): Promise<BonusSubmission[]> {
+    return await db.select().from(bonusSubmissions)
+      .where(and(eq(bonusSubmissions.seasonId, seasonId), eq(bonusSubmissions.weekId, weekId)));
+  }
+
+  async getBonusSubmissionsByTeam(teamId: number, seasonId: number): Promise<BonusSubmission[]> {
+    return await db.select().from(bonusSubmissions)
+      .where(and(eq(bonusSubmissions.teamId, teamId), eq(bonusSubmissions.seasonId, seasonId)))
+      .orderBy(bonusSubmissions.weekId);
+  }
+
+  async upsertBonusSubmission(submission: InsertBonusSubmission): Promise<BonusSubmission> {
+    const existing = await this.getBonusSubmission(submission.seasonId, submission.weekId, submission.teamId);
+    if (existing) {
+      const [updated] = await db.update(bonusSubmissions)
+        .set({ answersJson: submission.answersJson, updatedAt: new Date() })
+        .where(eq(bonusSubmissions.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(bonusSubmissions).values(submission).returning();
+    return created;
   }
 }
 

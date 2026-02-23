@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, unique, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -190,3 +190,60 @@ export const contestantEventsRelations = relations(contestantEvents, ({ one }) =
 export const insertContestantEventSchema = createInsertSchema(contestantEvents).omit({ id: true });
 export type InsertContestantEvent = z.infer<typeof insertContestantEventSchema>;
 export type ContestantEvent = typeof contestantEvents.$inferSelect;
+
+export const teamSecrets = pgTable("team_secrets", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  teamId: integer("team_id").references(() => teams.id).notNull().unique(),
+  passcodeHash: text("passcode_hash").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const teamSecretsRelations = relations(teamSecrets, ({ one }) => ({
+  team: one(teams, { fields: [teamSecrets.teamId], references: [teams.id] }),
+}));
+
+export type TeamSecret = typeof teamSecrets.$inferSelect;
+
+export const bonusQuestions = pgTable("bonus_questions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  seasonId: integer("season_id").references(() => seasons.id).notNull(),
+  weekId: integer("week_id").references(() => weeks.id).notNull(),
+  questionText: text("question_text").notNull(),
+  questionType: text("question_type").notNull(),
+  points: integer("points").default(0).notNull(),
+  optionsJson: text("options_json"),
+  correctAnswer: text("correct_answer"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const bonusQuestionsRelations = relations(bonusQuestions, ({ one }) => ({
+  season: one(seasons, { fields: [bonusQuestions.seasonId], references: [seasons.id] }),
+  week: one(weeks, { fields: [bonusQuestions.weekId], references: [weeks.id] }),
+}));
+
+export const insertBonusQuestionSchema = createInsertSchema(bonusQuestions).omit({ id: true, createdAt: true });
+export type InsertBonusQuestion = z.infer<typeof insertBonusQuestionSchema>;
+export type BonusQuestion = typeof bonusQuestions.$inferSelect;
+
+export const bonusSubmissions = pgTable("bonus_submissions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  seasonId: integer("season_id").references(() => seasons.id).notNull(),
+  weekId: integer("week_id").references(() => weeks.id).notNull(),
+  teamId: integer("team_id").references(() => teams.id).notNull(),
+  answersJson: text("answers_json").notNull(),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.seasonId, table.weekId, table.teamId),
+]);
+
+export const bonusSubmissionsRelations = relations(bonusSubmissions, ({ one }) => ({
+  season: one(seasons, { fields: [bonusSubmissions.seasonId], references: [seasons.id] }),
+  week: one(weeks, { fields: [bonusSubmissions.weekId], references: [weeks.id] }),
+  team: one(teams, { fields: [bonusSubmissions.teamId], references: [teams.id] }),
+}));
+
+export const insertBonusSubmissionSchema = createInsertSchema(bonusSubmissions).omit({ id: true, submittedAt: true, updatedAt: true });
+export type InsertBonusSubmission = z.infer<typeof insertBonusSubmissionSchema>;
+export type BonusSubmission = typeof bonusSubmissions.$inferSelect;

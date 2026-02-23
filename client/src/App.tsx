@@ -9,6 +9,7 @@ import Teams from "@/pages/Teams";
 import Contestants from "@/pages/Contestants";
 import Admin from "@/pages/Admin";
 import Rules from "@/pages/Rules";
+import Bonus from "@/pages/Bonus";
 import Navbar from "@/components/Navbar";
 
 function Router() {
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/teams" component={Teams} />
       <Route path="/contestants" component={Contestants} />
+      <Route path="/bonus" component={Bonus} />
       <Route path="/admin" component={Admin} />
       <Route path="/rules" component={Rules} />
       <Route component={NotFound} />
