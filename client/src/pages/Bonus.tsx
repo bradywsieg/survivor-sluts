@@ -81,20 +81,23 @@ export default function Bonus() {
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [passcode, setPasscode] = useState("");
   const [isVerified, setIsVerified] = useState(false);
+  const [lockedSeasonId, setLockedSeasonId] = useState<string>("");
   const [showSetPasscode, setShowSetPasscode] = useState(false);
   const [newPasscode, setNewPasscode] = useState("");
   const [oldPasscode, setOldPasscode] = useState("");
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [expandedHistory, setExpandedHistory] = useState<Record<number, boolean>>({});
 
+  const activeSeasonId = isVerified ? lockedSeasonId : selectedSeasonId;
+
   const { data: weeks = [] } = useQuery<Week[]>({
-    queryKey: ["/api/weeks", { seasonId: selectedSeasonId }],
+    queryKey: ["/api/weeks", { seasonId: activeSeasonId }],
     queryFn: async () => {
-      const res = await fetch(`/api/weeks?seasonId=${selectedSeasonId}`);
+      const res = await fetch(`/api/weeks?seasonId=${activeSeasonId}`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
-    enabled: !!selectedSeasonId,
+    enabled: !!activeSeasonId,
   });
 
   const { data: allTeams = [] } = useQuery<Team[]>({
@@ -106,26 +109,28 @@ export default function Bonus() {
     },
   });
 
-  const teams = allTeams;
+  const teams = activeSeasonId
+    ? allTeams.filter(t => t.seasonId === parseInt(activeSeasonId))
+    : [];
 
   const { data: contestants = [] } = useQuery<Contestant[]>({
-    queryKey: ["/api/contestants", { seasonId: selectedSeasonId }],
+    queryKey: ["/api/contestants", { seasonId: activeSeasonId }],
     queryFn: async () => {
-      const res = await fetch(`/api/contestants?seasonId=${selectedSeasonId}`);
+      const res = await fetch(`/api/contestants?seasonId=${activeSeasonId}`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
-    enabled: !!selectedSeasonId,
+    enabled: !!activeSeasonId,
   });
 
   const { data: questions = [] } = useQuery<BonusQuestion[]>({
-    queryKey: ["/api/bonus/questions", { seasonId: selectedSeasonId, weekId: selectedWeekId }],
+    queryKey: ["/api/bonus/questions", { seasonId: activeSeasonId, weekId: selectedWeekId }],
     queryFn: async () => {
-      const res = await fetch(`/api/bonus/questions?seasonId=${selectedSeasonId}&weekId=${selectedWeekId}`);
+      const res = await fetch(`/api/bonus/questions?seasonId=${activeSeasonId}&weekId=${selectedWeekId}`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
-    enabled: !!selectedSeasonId && !!selectedWeekId,
+    enabled: !!activeSeasonId && !!selectedWeekId,
   });
 
   const { data: deadlineStatus } = useQuery<{ open: boolean; deadline: string | null }>({
@@ -150,37 +155,40 @@ export default function Bonus() {
   });
 
   const { data: history = [] } = useQuery<HistoryEntry[]>({
-    queryKey: ["/api/bonus/history", selectedTeamId, { seasonId: selectedSeasonId }],
+    queryKey: ["/api/bonus/history", selectedTeamId, { seasonId: activeSeasonId }],
     queryFn: async () => {
-      const res = await fetch(`/api/bonus/history/${selectedTeamId}?seasonId=${selectedSeasonId}`);
+      const res = await fetch(`/api/bonus/history/${selectedTeamId}?seasonId=${activeSeasonId}`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
-    enabled: !!selectedTeamId && !!selectedSeasonId && isVerified,
+    enabled: !!selectedTeamId && !!activeSeasonId && isVerified,
   });
 
   useEffect(() => {
     if (weeks.length > 0 && !selectedWeekId) {
       setSelectedWeekId(weeks[weeks.length - 1].id.toString());
     }
-  }, [weeks.length]);
+  }, [weeks]);
+
+  useEffect(() => {
+    setSelectedTeamId("");
+    setIsVerified(false);
+    setPasscode("");
+    setAnswers({});
+    setShowSetPasscode(false);
+    setSelectedWeekId("");
+  }, [selectedSeasonId]);
 
   useEffect(() => {
     setIsVerified(false);
     setPasscode("");
     setAnswers({});
     setShowSetPasscode(false);
-    if (selectedTeamId) {
-      const team = allTeams.find(t => t.id === parseInt(selectedTeamId));
-      if (team?.seasonId) {
-        setSelectedSeasonId(team.seasonId.toString());
-        setSelectedWeekId("");
-      }
-    }
   }, [selectedTeamId]);
 
   const isOpen = deadlineStatus?.open ?? true;
   const activeContestants = contestants.filter(c => !c.eliminated);
+  const activeSeason = seasons.find(s => s.id.toString() === activeSeasonId);
 
   const verifyMutation = useMutation({
     mutationFn: async () => {
@@ -193,6 +201,7 @@ export default function Bonus() {
     },
     onSuccess: (data) => {
       if (data.verified) {
+        setLockedSeasonId(selectedSeasonId);
         setIsVerified(true);
         toast({ title: "Verified!" });
       } else {
@@ -235,7 +244,7 @@ export default function Bonus() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          seasonId: parseInt(selectedSeasonId),
+          seasonId: parseInt(activeSeasonId),
           weekId: parseInt(selectedWeekId),
           teamId: parseInt(selectedTeamId),
           passcode,
@@ -390,29 +399,44 @@ export default function Bonus() {
           </h1>
         </div>
 
-        <Card className="mb-6">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              Select Your Team
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-              <SelectTrigger data-testid="select-bonus-team">
-                <SelectValue placeholder="Select your team" />
-              </SelectTrigger>
-              <SelectContent>
-                {teams.map((team) => (
-                  <SelectItem key={team.id} value={team.id.toString()}>
-                    {team.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
+        {!isVerified && (
+          <Card className="mb-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Season &amp; Team</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-sm mb-1 block">Season</Label>
+                <SeasonSelector
+                  seasons={seasons}
+                  selectedSeasonId={selectedSeasonId}
+                  onSeasonChange={(id) => { setSelectedSeasonId(id); }}
+                />
+              </div>
+              <div>
+                <Label className="text-sm mb-1 block">Team</Label>
+                <Select
+                  value={selectedTeamId}
+                  onValueChange={setSelectedTeamId}
+                  disabled={!selectedSeasonId}
+                >
+                  <SelectTrigger data-testid="select-bonus-team">
+                    <SelectValue placeholder={!selectedSeasonId ? "Select a season first" : "Select your team"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id.toString()}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {selectedTeamId && (
+        {!isVerified && selectedTeamId && (
           <Card className="mb-6">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -441,7 +465,7 @@ export default function Bonus() {
                     </Button>
                   </div>
                 </div>
-              ) : !isVerified ? (
+              ) : (
                 <div className="space-y-3">
                   <div className="flex gap-2">
                     <Input
@@ -496,11 +520,6 @@ export default function Bonus() {
                     </div>
                   )}
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 text-sm text-green-600">
-                  <CheckCircle className="h-4 w-4" />
-                  Verified
-                </div>
               )}
             </CardContent>
           </Card>
@@ -508,30 +527,29 @@ export default function Bonus() {
 
         {isVerified && (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <div>
-                <Label className="text-sm mb-1 block">Season</Label>
-                <SeasonSelector
-                  seasons={seasons}
-                  selectedSeasonId={selectedSeasonId}
-                  onSeasonChange={(id) => { setSelectedSeasonId(id); setSelectedWeekId(""); }}
-                />
-              </div>
-              <div>
-                <Label className="text-sm mb-1 block">Week</Label>
-                <Select value={selectedWeekId} onValueChange={setSelectedWeekId}>
-                  <SelectTrigger data-testid="select-bonus-week">
-                    <SelectValue placeholder="Select week" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {weeks.map((week) => (
-                      <SelectItem key={week.id} value={week.id.toString()}>
-                        Week {week.weekNumber}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="flex items-center gap-2 mb-4 p-3 bg-muted/50 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-green-600 font-medium">Verified</span>
+              <span className="text-sm text-muted-foreground mx-2">|</span>
+              <span className="text-sm font-medium" data-testid="text-locked-season">{activeSeason?.name}</span>
+              <span className="text-sm text-muted-foreground mx-2">|</span>
+              <span className="text-sm font-medium" data-testid="text-locked-team">{allTeams.find(t => t.id === parseInt(selectedTeamId))?.name}</span>
+            </div>
+
+            <div className="mb-6">
+              <Label className="text-sm mb-1 block">Week</Label>
+              <Select value={selectedWeekId} onValueChange={setSelectedWeekId}>
+                <SelectTrigger data-testid="select-bonus-week">
+                  <SelectValue placeholder="Select week" />
+                </SelectTrigger>
+                <SelectContent>
+                  {weeks.map((week) => (
+                    <SelectItem key={week.id} value={week.id.toString()}>
+                      Week {week.weekNumber}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </>
         )}

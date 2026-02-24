@@ -96,6 +96,7 @@ shared/           # Shared types and schema
 - Admin bonus grading: bulk save all correct answers, expandable per-team submission viewer, score teams button
 - Admin-configurable per-week submission deadline (stored as timestamp on weeks table), formatted as mm/dd/yyyy at hh:mm AM/PM PST
 - Public bonus page: deadline enforcement hides questions when closed, checkmark icon for verified state, hover tooltip on disabled submit
+- Bonus page flow: Season first → Team (filtered by season, disabled until season selected) → Passcode → After auth, season hard-locked via lockedSeasonId with status bar showing "Verified | Season | Team", only week changeable
 - Submission history table with horizontal scroll on mobile, no line breaks
 
 ## External Dependencies
