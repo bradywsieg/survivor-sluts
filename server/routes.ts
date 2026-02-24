@@ -759,7 +759,7 @@ export async function registerRoutes(
         return {
           weekId: sub.weekId,
           weekNumber: week?.weekNumber,
-          submittedAt: sub.submittedAt,
+          submittedAt: sub.updatedAt || sub.submittedAt,
           answers: JSON.parse(sub.answersJson),
           questions: questions.map(q => ({
             id: q.id,
