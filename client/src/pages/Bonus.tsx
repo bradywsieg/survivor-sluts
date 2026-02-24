@@ -402,7 +402,7 @@ export default function Bonus() {
         {!isVerified && (
           <Card className="mb-6">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Season &amp; Team</CardTitle>
+              <CardTitle className="text-lg">Select values below to continue...</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -528,12 +528,12 @@ export default function Bonus() {
         {isVerified && (
           <>
             <div className="flex items-center gap-2 mb-4 p-3 bg-muted/50 rounded-lg">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-600 font-medium">Verified</span>
-              <span className="text-sm text-muted-foreground mx-2">|</span>
               <span className="text-sm font-medium" data-testid="text-locked-season">{activeSeason?.name}</span>
               <span className="text-sm text-muted-foreground mx-2">|</span>
               <span className="text-sm font-medium" data-testid="text-locked-team">{allTeams.find(t => t.id === parseInt(selectedTeamId))?.name}</span>
+              <span className="text-sm text-muted-foreground mx-2">|</span>
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-green-600 font-medium">Passcode Verified</span>
             </div>
 
             <div className="mb-6">
