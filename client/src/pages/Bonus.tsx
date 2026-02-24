@@ -97,15 +97,16 @@ export default function Bonus() {
     enabled: !!selectedSeasonId,
   });
 
-  const { data: teams = [] } = useQuery<Team[]>({
-    queryKey: ["/api/teams", { seasonId: selectedSeasonId }],
+  const { data: allTeams = [] } = useQuery<Team[]>({
+    queryKey: ["/api/teams"],
     queryFn: async () => {
-      const res = await fetch(`/api/teams?seasonId=${selectedSeasonId}`);
+      const res = await fetch(`/api/teams`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
-    enabled: !!selectedSeasonId,
   });
+
+  const teams = allTeams;
 
   const { data: contestants = [] } = useQuery<Contestant[]>({
     queryKey: ["/api/contestants", { seasonId: selectedSeasonId }],
@@ -169,6 +170,13 @@ export default function Bonus() {
     setPasscode("");
     setAnswers({});
     setShowSetPasscode(false);
+    if (selectedTeamId) {
+      const team = allTeams.find(t => t.id === parseInt(selectedTeamId));
+      if (team?.seasonId) {
+        setSelectedSeasonId(team.seasonId.toString());
+        setSelectedWeekId("");
+      }
+    }
   }, [selectedTeamId]);
 
   const isOpen = deadlineStatus?.open ?? true;
@@ -375,41 +383,23 @@ export default function Bonus() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 md:px-6 py-8">
-        <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
-          <div className="flex items-center gap-3">
-            <HelpCircle className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl md:text-4xl font-bold font-['Slackey'] tracking-wide" data-testid="text-page-title">
-              Bonus Questions
-            </h1>
-          </div>
-          <SeasonSelector
-            seasons={seasons}
-            selectedSeasonId={selectedSeasonId}
-            onSeasonChange={(id) => { setSelectedSeasonId(id); setSelectedWeekId(""); }}
-          />
+        <div className="flex items-center gap-3 mb-8">
+          <HelpCircle className="h-8 w-8 text-primary" />
+          <h1 className="text-3xl md:text-4xl font-bold font-['Slackey'] tracking-wide" data-testid="text-page-title">
+            Bonus Questions
+          </h1>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <div>
-            <Label className="text-sm mb-1 block">Week</Label>
-            <Select value={selectedWeekId} onValueChange={setSelectedWeekId}>
-              <SelectTrigger data-testid="select-bonus-week">
-                <SelectValue placeholder="Select week" />
-              </SelectTrigger>
-              <SelectContent>
-                {weeks.map((week) => (
-                  <SelectItem key={week.id} value={week.id.toString()}>
-                    Week {week.weekNumber}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-sm mb-1 block">Team</Label>
+        <Card className="mb-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              Select Your Team
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
               <SelectTrigger data-testid="select-bonus-team">
-                <SelectValue placeholder="Select team" />
+                <SelectValue placeholder="Select your team" />
               </SelectTrigger>
               <SelectContent>
                 {teams.map((team) => (
@@ -419,8 +409,8 @@ export default function Bonus() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {selectedTeamId && (
           <Card className="mb-6">
@@ -514,6 +504,36 @@ export default function Bonus() {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {isVerified && (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+              <div>
+                <Label className="text-sm mb-1 block">Season</Label>
+                <SeasonSelector
+                  seasons={seasons}
+                  selectedSeasonId={selectedSeasonId}
+                  onSeasonChange={(id) => { setSelectedSeasonId(id); setSelectedWeekId(""); }}
+                />
+              </div>
+              <div>
+                <Label className="text-sm mb-1 block">Week</Label>
+                <Select value={selectedWeekId} onValueChange={setSelectedWeekId}>
+                  <SelectTrigger data-testid="select-bonus-week">
+                    <SelectValue placeholder="Select week" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {weeks.map((week) => (
+                      <SelectItem key={week.id} value={week.id.toString()}>
+                        Week {week.weekNumber}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </>
         )}
 
         {isVerified && selectedWeekId && (

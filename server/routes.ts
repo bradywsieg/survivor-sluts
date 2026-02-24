@@ -968,12 +968,12 @@ export async function registerRoutes(
       const submissions = await storage.getBonusSubmissionsByWeek(seasonId, weekId);
       const allTeams = await storage.getTeams(seasonId);
       const allContestants = await storage.getContestants(seasonId);
-      const bonuses = await storage.getTeamBonusesByWeek(weekId);
+
+      const allQuestionsGraded = questions.every(q => q.correctAnswer !== null);
 
       const detail = submissions.map(sub => {
         const team = allTeams.find(t => t.id === sub.teamId);
         const answers: Record<string, any> = JSON.parse(sub.answersJson);
-        const bonus = bonuses.find(b => b.teamId === sub.teamId);
 
         const questionResults = questions.map(q => {
           const answer = answers[q.id.toString()];
@@ -1016,11 +1016,15 @@ export async function registerRoutes(
           };
         });
 
+        const computedTotal = allQuestionsGraded
+          ? questionResults.reduce((sum, qr) => sum + qr.pointsEarned, 0)
+          : null;
+
         return {
           teamId: sub.teamId,
           teamName: team?.name || `Team ${sub.teamId}`,
           submittedAt: sub.submittedAt,
-          totalBonus: bonus?.bonus ?? null,
+          totalBonus: computedTotal,
           questionResults,
         };
       });
