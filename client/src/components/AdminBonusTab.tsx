@@ -61,6 +61,7 @@ interface SubmissionDetail {
   teamId: number;
   teamName: string;
   submittedAt: string;
+  updatedAt: string;
   totalBonus: number | null;
   questionResults: {
     questionId: number;
@@ -634,6 +635,9 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                                 <Badge variant="outline">{sub.teamName}</Badge>
                                 <span className="text-xs text-muted-foreground">
                                   Submitted {new Date(sub.submittedAt).toLocaleString()}
+                                  {sub.updatedAt && new Date(sub.updatedAt).getTime() - new Date(sub.submittedAt).getTime() > 1000 && (
+                                    <> · Updated {new Date(sub.updatedAt).toLocaleString()}</>
+                                  )}
                                 </span>
                                 {sub.totalBonus !== null && (
                                   <Badge variant={sub.totalBonus > 0 ? "default" : sub.totalBonus < 0 ? "destructive" : "secondary"}>

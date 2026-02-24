@@ -1024,6 +1024,7 @@ export async function registerRoutes(
           teamId: sub.teamId,
           teamName: team?.name || `Team ${sub.teamId}`,
           submittedAt: sub.submittedAt,
+          updatedAt: sub.updatedAt,
           totalBonus: computedTotal,
           questionResults,
         };
