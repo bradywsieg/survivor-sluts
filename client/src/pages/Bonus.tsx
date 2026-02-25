@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import SeasonSelector from "@/components/SeasonSelector";
 import { useSeason } from "@/hooks/use-season";
-import { HelpCircle, Lock, Send, History, ChevronDown, ChevronUp, CheckCircle, Clock } from "lucide-react";
+import { HelpCircle, Lock, Send, History, ChevronDown, ChevronUp, CheckCircle, Clock, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -528,10 +528,27 @@ export default function Bonus() {
         {isVerified && (
           <>
             <div className="flex items-center gap-2 mb-4 p-3 bg-muted/50 rounded-lg">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 mr-1"
+                onClick={() => {
+                  setIsVerified(false);
+                  setLockedSeasonId("");
+                  setSelectedTeamId("");
+                  setPasscode("");
+                  setSelectedWeekId("");
+                }}
+                data-testid="button-bonus-back"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+              <span className="text-sm text-muted-foreground mx-1">|</span>
               <span className="text-sm font-medium" data-testid="text-locked-season">{activeSeason?.name}</span>
-              <span className="text-sm text-muted-foreground mx-2">|</span>
+              <span className="text-sm text-muted-foreground mx-1">|</span>
               <span className="text-sm font-medium" data-testid="text-locked-team">{allTeams.find(t => t.id === parseInt(selectedTeamId))?.name}</span>
-              <span className="text-sm text-muted-foreground mx-2">|</span>
+              <span className="text-sm text-muted-foreground mx-1">|</span>
               <CheckCircle className="h-4 w-4 text-green-600" />
               <span className="text-sm text-green-600 font-medium">Passcode Verified</span>
             </div>
