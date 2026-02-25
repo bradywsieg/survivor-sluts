@@ -527,24 +527,22 @@ export default function Bonus() {
 
         {isVerified && (
           <>
+            <Button
+              size="sm"
+              className="mb-3 bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => {
+                setIsVerified(false);
+                setLockedSeasonId("");
+                setSelectedTeamId("");
+                setPasscode("");
+                setSelectedWeekId("");
+              }}
+              data-testid="button-bonus-back"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
             <div className="flex items-center gap-2 mb-4 p-3 bg-muted/50 rounded-lg">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 mr-1"
-                onClick={() => {
-                  setIsVerified(false);
-                  setLockedSeasonId("");
-                  setSelectedTeamId("");
-                  setPasscode("");
-                  setSelectedWeekId("");
-                }}
-                data-testid="button-bonus-back"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Button>
-              <span className="text-sm text-muted-foreground mx-1">|</span>
               <span className="text-sm font-medium" data-testid="text-locked-season">{activeSeason?.name}</span>
               <span className="text-sm text-muted-foreground mx-1">|</span>
               <span className="text-sm font-medium" data-testid="text-locked-team">{allTeams.find(t => t.id === parseInt(selectedTeamId))?.name}</span>
