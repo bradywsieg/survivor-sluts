@@ -158,8 +158,35 @@ export default function Contestants() {
     return tribes.find(t => t.id === tribeId);
   };
 
-  const activeContestants = contestants.filter(c => !c.eliminated);
-  const eliminatedContestants = contestants.filter(c => c.eliminated);
+  const groupedByTribe = () => {
+    const groups: { tribe: Tribe | null; contestants: Contestant[] }[] = [];
+    const tribeMap = new Map<number, Contestant[]>();
+    const noTribe: Contestant[] = [];
+
+    contestants.forEach(c => {
+      if (c.tribeId) {
+        if (!tribeMap.has(c.tribeId)) tribeMap.set(c.tribeId, []);
+        tribeMap.get(c.tribeId)!.push(c);
+      } else {
+        noTribe.push(c);
+      }
+    });
+
+    tribes.forEach(t => {
+      const tribeContestants = tribeMap.get(t.id) || [];
+      if (tribeContestants.length > 0) {
+        groups.push({ tribe: t, contestants: tribeContestants });
+      }
+    });
+
+    if (noTribe.length > 0) {
+      groups.push({ tribe: null, contestants: noTribe });
+    }
+
+    return groups;
+  };
+
+  const tribeGroups = groupedByTribe();
 
   if (isLoading) {
     return (
@@ -206,11 +233,24 @@ export default function Contestants() {
           </div>
         </div>
 
-        {activeContestants.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Active ({activeContestants.length})</h2>
+        {tribeGroups.map((group) => (
+          <div key={group.tribe?.id ?? "none"} className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              {group.tribe && (
+                <div
+                  className="w-4 h-4 rounded-full shrink-0"
+                  style={{ backgroundColor: group.tribe.color }}
+                />
+              )}
+              <h2 className="text-xl font-semibold">
+                {group.tribe?.name ?? "No Tribe"}
+              </h2>
+              <span className="text-sm text-muted-foreground">
+                ({group.contestants.length})
+              </span>
+            </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeContestants.map((contestant) => {
+              {group.contestants.map((contestant) => {
                 const tribe = getTribe(contestant.tribeId);
                 return (
                   <ContestantCard
@@ -231,34 +271,7 @@ export default function Contestants() {
               })}
             </div>
           </div>
-        )}
-
-        {eliminatedContestants.length > 0 && (
-          <div>
-            <h2 className="text-xl font-semibold mb-4 text-muted-foreground">Eliminated ({eliminatedContestants.length})</h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {eliminatedContestants.map((contestant) => {
-                const tribe = getTribe(contestant.tribeId);
-                return (
-                  <ContestantCard
-                    key={contestant.id}
-                    id={contestant.id}
-                    name={contestant.name}
-                    imageUrl={contestant.imageUrl || undefined}
-                    totalPoints={calculateContestantPoints(contestant.id)}
-                    teamName={teams.find(t => t.id === contestant.teamId)?.name}
-                    eliminated={contestant.eliminated}
-                    tribeColor={tribe?.color}
-                    tribeName={tribe?.name}
-                    bio={contestant.bio || undefined}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        )}
+        ))}
 
         {contestants.length === 0 && (
           <div className="text-center py-16">

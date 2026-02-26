@@ -142,7 +142,7 @@ export default function Dashboard() {
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
               <CardTitle className="flex items-center gap-2 text-2xl font-bold font-['Slackey'] tracking-wide">
                 <Eye className="h-6 w-6 text-primary" />
-                Idol & Advantage Watch
+                Idol & Advantage Tracker
               </CardTitle>
             </CardHeader>
             <CardContent>

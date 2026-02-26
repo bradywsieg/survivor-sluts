@@ -84,10 +84,14 @@ shared/           # Shared types and schema
 - Admin now has 4 tabs: Enter Results, Point Value Settings, Seasons, Tribes
 - ContestantCard shows tribe color left border, tribe name, and bio with See more/less toggle
 - ContestantFormDialog includes tribe dropdown and bio textarea
-- TeamCard contestant pills styled with tribe colors (background + border)
+- TeamCard contestant pills styled with tribe colors (background + border), clickable to open read-only detail modal with events/scores
+- Eliminated contestants shown with grayscale/opacity treatment on team pills, X icon indicator
+- Contestants page groups contestants by tribe with colored tribe headers
+- Admin Enter Results includes tribe affiliation display (color dot + name), contestant search bar, and tribe filter dropdown
+- API endpoint GET /api/contestants/:id/events returns all events for a contestant across weeks
 - ContestantPerformanceChart avatars have tribe color ring outlines
 - Dashboard chart renamed to "Team Scoring by Week"
-- Added Idol & Advantage Watch dashboard section (event-based idol/advantage tracking)
+- Dashboard "Idol & Advantage Tracker" section (event-based idol/advantage tracking)
 - Dashboard API returns tribes and idolWatch data
 - Seeded Season 50 with 3 tribes (Vatu/purple, Cila/orange, Kalo/teal) and contestant bios
 - PWA configured with custom app icon, manifest, and service worker

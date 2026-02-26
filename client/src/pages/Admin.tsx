@@ -25,6 +25,7 @@ interface Contestant {
   imageUrl?: string | null;
   eliminated?: boolean;
   teamId?: number | null;
+  tribeId?: number | null;
 }
 
 interface Team {
@@ -96,6 +97,8 @@ function AdminContent() {
   const [editingTribe, setEditingTribe] = useState<Tribe | null>(null);
   const [tribeName, setTribeName] = useState("");
   const [tribeColor, setTribeColor] = useState("#808080");
+  const [contestantSearch, setContestantSearch] = useState("");
+  const [tribeFilter, setTribeFilter] = useState<string>("all");
 
   const { data: contestants = [], isLoading: contestantsLoading } = useQuery<Contestant[]>({
     queryKey: ["/api/contestants", { seasonId: selectedSeasonId }],
@@ -588,17 +591,57 @@ function AdminContent() {
                 ) : contestants.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">Add contestants before entering results.</p>
                 ) : (
+                  <>
+                  <div className="flex items-center gap-3 mb-4 flex-wrap">
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search contestants..."
+                        value={contestantSearch}
+                        onChange={(e) => setContestantSearch(e.target.value)}
+                        className="pl-9"
+                        data-testid="input-contestant-search"
+                      />
+                    </div>
+                    <Select value={tribeFilter} onValueChange={setTribeFilter}>
+                      <SelectTrigger className="w-40" data-testid="select-tribe-filter">
+                        <SelectValue placeholder="All Tribes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Tribes</SelectItem>
+                        {tribes.map((tribe) => (
+                          <SelectItem key={tribe.id} value={tribe.id.toString()}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: tribe.color }} />
+                              {tribe.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="none">No Tribe</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-3">
-                    {contestants.map((contestant) => {
+                    {contestants
+                      .filter(c => {
+                        if (contestantSearch && !c.name.toLowerCase().includes(contestantSearch.toLowerCase())) return false;
+                        if (tribeFilter === "none" && c.tribeId) return false;
+                        if (tribeFilter === "none" && !c.tribeId) return true;
+                        if (tribeFilter !== "all" && tribeFilter !== "none" && c.tribeId !== parseInt(tribeFilter)) return false;
+                        return true;
+                      })
+                      .map((contestant) => {
                       const evts = contestantEvents.filter(e => e.contestantId === contestant.id);
                       const totalPoints = evts.reduce((sum, e) => sum + getEventPoints(e), 0);
                       const isEliminated = contestant.eliminated;
                       const team = teams.find(t => t.id === contestant.teamId);
+                      const tribe = tribes.find(t => t.id === contestant.tribeId);
 
                       return (
                         <div
                           key={contestant.id}
                           className={`border rounded-md p-3 ${isEliminated ? "opacity-50 bg-muted/30" : ""}`}
+                          style={tribe ? { borderLeftWidth: '3px', borderLeftColor: tribe.color } : undefined}
                           data-testid={`row-contestant-${contestant.id}`}
                         >
                           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -611,7 +654,18 @@ function AdminContent() {
                               </Avatar>
                               <div className="min-w-0">
                                 <span className="font-medium block truncate">{contestant.name}</span>
-                                {team && <span className="text-xs text-muted-foreground">{team.name}</span>}
+                                <div className="flex items-center gap-2">
+                                  {team && <span className="text-xs text-muted-foreground">{team.name}</span>}
+                                  {tribe && (
+                                    <>
+                                      {team && <span className="text-xs text-muted-foreground">·</span>}
+                                      <span className="text-xs flex items-center gap-1" style={{ color: tribe.color }}>
+                                        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: tribe.color }} />
+                                        {tribe.name}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -666,6 +720,7 @@ function AdminContent() {
                       );
                     })}
                   </div>
+                  </>
                 )}
               </CardContent>
             </Card>

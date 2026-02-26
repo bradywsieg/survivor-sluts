@@ -557,6 +557,32 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/contestants/:contestantId/events", async (req, res) => {
+    try {
+      const contestantId = parseInt(req.params.contestantId);
+      const seasonId = parseInt(req.query.seasonId as string);
+      if (!seasonId) return res.status(400).json({ error: "seasonId required" });
+      const allEvents = await storage.getContestantEventsBySeason(seasonId);
+      const contestantEvts = allEvents.filter(e => e.contestantId === contestantId);
+      const weeks = await storage.getWeeks(seasonId);
+      const eventSettings = await storage.getSeasonEventSettings(seasonId);
+      const result = contestantEvts.map(evt => {
+        const week = weeks.find(w => w.id === evt.weekId);
+        const pts = evt.pointsOverride !== null ? evt.pointsOverride : (eventSettings.find(s => s.eventKey === evt.eventKey)?.points ?? 0);
+        return {
+          id: evt.id,
+          weekNumber: week?.weekNumber,
+          eventName: evt.eventName,
+          eventKey: evt.eventKey,
+          points: pts,
+        };
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch contestant events" });
+    }
+  });
+
   // Contestant Events API
   app.get("/api/seasons/:seasonId/weeks/:weekId/contestant-events", async (req, res) => {
     try {

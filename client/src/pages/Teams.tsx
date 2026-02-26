@@ -17,6 +17,8 @@ interface Contestant {
   imageUrl?: string;
   teamId?: number;
   tribeId?: number | null;
+  eliminated?: boolean;
+  bio?: string | null;
 }
 
 interface Tribe {
@@ -220,9 +222,13 @@ export default function Teams() {
               name={team.name}
               imageUrl={team.imageUrl}
               totalPoints={calculateTeamPoints(team.id)}
+              seasonId={selectedSeasonId}
               contestants={contestants.filter(c => c.teamId === team.id).map(c => ({
                 ...c,
                 tribeColor: tribes.find(t => t.id === c.tribeId)?.color,
+                tribeName: tribes.find(t => t.id === c.tribeId)?.name,
+                eliminated: c.eliminated,
+                bio: c.bio || undefined,
               }))}
               onEdit={handleEdit}
               onDelete={handleDelete}
