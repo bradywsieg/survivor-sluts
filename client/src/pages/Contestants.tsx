@@ -159,12 +159,15 @@ export default function Contestants() {
   };
 
   const groupedByTribe = () => {
-    const groups: { tribe: Tribe | null; contestants: Contestant[] }[] = [];
+    const groups: { tribe: Tribe | null; contestants: Contestant[]; isEliminated?: boolean }[] = [];
     const tribeMap = new Map<number, Contestant[]>();
     const noTribe: Contestant[] = [];
+    const eliminated: Contestant[] = [];
 
     contestants.forEach(c => {
-      if (c.tribeId) {
+      if (c.eliminated) {
+        eliminated.push(c);
+      } else if (c.tribeId) {
         if (!tribeMap.has(c.tribeId)) tribeMap.set(c.tribeId, []);
         tribeMap.get(c.tribeId)!.push(c);
       } else {
@@ -181,6 +184,10 @@ export default function Contestants() {
 
     if (noTribe.length > 0) {
       groups.push({ tribe: null, contestants: noTribe });
+    }
+
+    if (eliminated.length > 0) {
+      groups.push({ tribe: null, contestants: eliminated, isEliminated: true });
     }
 
     return groups;
@@ -234,16 +241,18 @@ export default function Contestants() {
         </div>
 
         {tribeGroups.map((group) => (
-          <div key={group.tribe?.id ?? "none"} className="mb-8">
+          <div key={group.isEliminated ? "eliminated" : (group.tribe?.id ?? "none")} className="mb-8">
             <div className="flex items-center gap-3 mb-4">
-              {group.tribe && (
+              {group.isEliminated ? (
+                <div className="w-4 h-4 rounded-full shrink-0 bg-muted-foreground/50" />
+              ) : group.tribe ? (
                 <div
                   className="w-4 h-4 rounded-full shrink-0"
                   style={{ backgroundColor: group.tribe.color }}
                 />
-              )}
-              <h2 className="text-xl font-semibold">
-                {group.tribe?.name ?? "No Tribe"}
+              ) : null}
+              <h2 className={`text-xl font-semibold ${group.isEliminated ? "text-muted-foreground" : ""}`}>
+                {group.isEliminated ? "Eliminated" : (group.tribe?.name ?? "No Tribe")}
               </h2>
               <span className="text-sm text-muted-foreground">
                 ({group.contestants.length})

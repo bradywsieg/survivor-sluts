@@ -210,6 +210,7 @@ function AdminContent() {
       queryClient.invalidateQueries({ queryKey: ["/api/weeks", selectedWeekId, "scores"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scores"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contestants"] });
       setAddEventContestantId(null);
       setSelectedEventKeys([]);
       setEventSearchQuery("");
@@ -230,6 +231,7 @@ function AdminContent() {
       queryClient.invalidateQueries({ queryKey: ["/api/weeks", selectedWeekId, "scores"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scores"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contestants"] });
       toast({ title: "Event Removed", description: "Score recalculated." });
     },
     onError: () => {
