@@ -271,6 +271,7 @@ export default function Bonus() {
   };
 
   const getContestantName = (id: string | number) => {
+    if (id.toString() === "jeff_probst") return "Jeff Probst";
     const c = contestants.find(c => c.id === parseInt(id.toString()));
     return c?.name || `Unknown (#${id})`;
   };
@@ -356,6 +357,7 @@ export default function Bonus() {
                   <SelectValue placeholder="Select contestant" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="jeff_probst">Jeff Probst</SelectItem>
                   {activeContestants.map(c => (
                     <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
                   ))}

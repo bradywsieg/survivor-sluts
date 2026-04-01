@@ -563,6 +563,7 @@ export default function AdminBonusTab({ selectedSeasonId, weeks }: { selectedSea
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
+                                <SelectItem value="jeff_probst">Jeff Probst</SelectItem>
                                 {activeContestants.map(c => (
                                   <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
                                 ))}

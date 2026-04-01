@@ -1025,8 +1025,12 @@ export async function registerRoutes(
           }
 
           if (q.questionType === "contestant" && userAnswer) {
-            const c = allContestants.find(c => c.id === parseInt(userAnswer));
-            userAnswer = c?.name || userAnswer;
+            if (userAnswer === "jeff_probst") {
+              userAnswer = "Jeff Probst";
+            } else {
+              const c = allContestants.find(c => c.id === parseInt(userAnswer));
+              userAnswer = c?.name || userAnswer;
+            }
           }
 
           return {
