@@ -10,7 +10,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import SeasonSelector from "@/components/SeasonSelector";
 import { useSeason } from "@/hooks/use-season";
-import { HelpCircle, Lock, Send, History, ChevronDown, ChevronUp, CheckCircle, Clock, ArrowLeft } from "lucide-react";
+import { HelpCircle, Lock, Send, History, ChevronDown, ChevronUp, CheckCircle, Clock, ArrowLeft, BookOpen, Users, Shield, X } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,6 +44,16 @@ interface Contestant {
   name: string;
   eliminated: boolean;
   seasonId: number | null;
+  teamId: number | null;
+}
+
+interface IdolWatchItem {
+  contestantId: number;
+  name: string;
+  tribeColor?: string | null;
+  tribeName?: string | null;
+  unplayedIdols: number;
+  unplayedAdvantages: number;
 }
 
 interface HistoryEntry {
@@ -87,6 +98,8 @@ export default function Bonus() {
   const [oldPasscode, setOldPasscode] = useState("");
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [expandedHistory, setExpandedHistory] = useState<Record<number, boolean>>({});
+  const [refOpen, setRefOpen] = useState(false);
+  const [refTab, setRefTab] = useState<"teams" | "idols">("teams");
 
   const activeSeasonId = isVerified ? lockedSeasonId : selectedSeasonId;
 
@@ -121,6 +134,16 @@ export default function Bonus() {
       return res.json();
     },
     enabled: !!activeSeasonId,
+  });
+
+  const { data: dashboardData } = useQuery<{ idolWatch: IdolWatchItem[] }>({
+    queryKey: ["/api/dashboard", { seasonId: activeSeasonId }],
+    queryFn: async () => {
+      const res = await fetch(activeSeasonId ? `/api/dashboard?seasonId=${activeSeasonId}` : `/api/dashboard`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!activeSeasonId && refOpen && refTab === "idols",
   });
 
   const { data: questions = [] } = useQuery<BonusQuestion[]>({
@@ -394,12 +417,135 @@ export default function Bonus() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 md:px-6 py-8">
-        <div className="flex items-center gap-3 mb-8">
-          <HelpCircle className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl md:text-4xl font-bold font-['Slackey'] tracking-wide" data-testid="text-page-title">
-            Bonus Questions
-          </h1>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <HelpCircle className="h-8 w-8 text-primary" />
+            <h1 className="text-3xl md:text-4xl font-bold font-['Slackey'] tracking-wide" data-testid="text-page-title">
+              Bonus Questions
+            </h1>
+          </div>
+          {activeSeasonId && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 shrink-0"
+              onClick={() => { setRefTab("teams"); setRefOpen(true); }}
+              data-testid="button-quick-reference"
+            >
+              <BookOpen className="h-4 w-4" />
+              <span className="hidden sm:inline">Quick Reference</span>
+              <span className="sm:hidden">Ref</span>
+            </Button>
+          )}
         </div>
+
+        <Sheet open={refOpen} onOpenChange={setRefOpen}>
+          <SheetContent side="right" className="w-full sm:w-[420px] flex flex-col p-0">
+            <SheetHeader className="px-5 pt-5 pb-4 border-b">
+              <SheetTitle className="font-['Slackey'] tracking-wide text-xl flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                Quick Reference
+              </SheetTitle>
+            </SheetHeader>
+
+            <div className="flex gap-2 px-5 pt-4">
+              <button
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${refTab === "teams" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                onClick={() => setRefTab("teams")}
+                data-testid="button-ref-tab-teams"
+              >
+                <Users className="h-4 w-4" />
+                Teams
+              </button>
+              <button
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${refTab === "idols" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                onClick={() => setRefTab("idols")}
+                data-testid="button-ref-tab-idols"
+              >
+                <Shield className="h-4 w-4" />
+                Idols &amp; Advantages
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 pt-4 pb-6 space-y-4">
+              {refTab === "teams" ? (
+                teams.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No teams found for this season.</p>
+                ) : (
+                  teams.map(team => {
+                    const teamContestants = contestants.filter(c => c.teamId === team.id);
+                    const active = teamContestants.filter(c => !c.eliminated);
+                    const eliminated = teamContestants.filter(c => c.eliminated);
+                    return (
+                      <div key={team.id} className="border rounded-xl overflow-hidden" data-testid={`ref-team-${team.id}`}>
+                        <div className="bg-muted/60 px-4 py-2.5 font-semibold text-sm font-['Slackey'] tracking-wide flex items-center gap-2">
+                          <Users className="h-4 w-4 text-primary" />
+                          {team.name}
+                        </div>
+                        <div className="px-4 py-3 space-y-1">
+                          {active.length === 0 && eliminated.length === 0 && (
+                            <p className="text-xs text-muted-foreground">No contestants assigned</p>
+                          )}
+                          {active.map(c => (
+                            <div key={c.id} className="flex items-center gap-2 text-sm py-0.5" data-testid={`ref-contestant-${c.id}`}>
+                              <div className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                              <span>{c.name}</span>
+                            </div>
+                          ))}
+                          {eliminated.map(c => (
+                            <div key={c.id} className="flex items-center gap-2 text-sm py-0.5 opacity-50" data-testid={`ref-contestant-elim-${c.id}`}>
+                              <X className="h-3 w-3 text-destructive shrink-0" />
+                              <span className="line-through">{c.name}</span>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 ml-auto">Out</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })
+                )
+              ) : (
+                dashboardData?.idolWatch == null ? (
+                  <div className="py-8 text-center">
+                    <Skeleton className="h-4 w-48 mx-auto mb-2" />
+                    <Skeleton className="h-4 w-36 mx-auto" />
+                  </div>
+                ) : dashboardData.idolWatch.length === 0 ? (
+                  <div className="text-center py-10">
+                    <Shield className="h-10 w-10 mx-auto text-muted-foreground mb-3 opacity-40" />
+                    <p className="text-sm text-muted-foreground">No active idols or advantages this season.</p>
+                  </div>
+                ) : (
+                  dashboardData.idolWatch.map(item => (
+                    <div key={item.contestantId} className="border rounded-xl px-4 py-3 flex items-start gap-3" data-testid={`ref-idol-${item.contestantId}`}>
+                      {item.tribeColor && (
+                        <div className="h-4 w-1.5 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: item.tribeColor }} />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm">{item.name}</p>
+                        {item.tribeName && (
+                          <p className="text-xs text-muted-foreground mb-1.5">{item.tribeName}</p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          {item.unplayedIdols > 0 && (
+                            <Badge className="bg-amber-100 text-amber-800 border-amber-200" variant="outline">
+                              🏺 {item.unplayedIdols} {item.unplayedIdols === 1 ? "idol" : "idols"}
+                            </Badge>
+                          )}
+                          {item.unplayedAdvantages > 0 && (
+                            <Badge className="bg-purple-100 text-purple-800 border-purple-200" variant="outline">
+                              ⚡ {item.unplayedAdvantages} {item.unplayedAdvantages === 1 ? "advantage" : "advantages"}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {!isVerified && (
           <Card className="mb-6">
