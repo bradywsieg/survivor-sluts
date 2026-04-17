@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import SeasonSelector from "@/components/SeasonSelector";
 import { useSeason } from "@/hooks/use-season";
-import { HelpCircle, Lock, Send, History, ChevronDown, ChevronUp, CheckCircle, Clock, ArrowLeft, BookOpen, Users, Shield, X } from "lucide-react";
+import { HelpCircle, Lock, Send, History, ChevronDown, ChevronUp, CheckCircle, Clock, ArrowLeft, Info, Users, Shield, X } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -432,9 +432,9 @@ export default function Bonus() {
               onClick={() => { setRefTab("teams"); setRefOpen(true); }}
               data-testid="button-quick-reference"
             >
-              <BookOpen className="h-4 w-4" />
-              <span className="hidden sm:inline">Quick Reference</span>
-              <span className="sm:hidden">Ref</span>
+              <Info className="h-4 w-4" />
+              <span className="hidden sm:inline">Quick Info</span>
+              <span className="sm:hidden">Info</span>
             </Button>
           )}
         </div>
@@ -443,8 +443,8 @@ export default function Bonus() {
           <SheetContent side="right" className="w-full sm:w-[420px] flex flex-col p-0">
             <SheetHeader className="px-5 pt-5 pb-4 border-b">
               <SheetTitle className="font-['Slackey'] tracking-wide text-xl flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                Quick Reference
+                <Info className="h-5 w-5 text-primary" />
+                Quick Info
               </SheetTitle>
             </SheetHeader>
 
