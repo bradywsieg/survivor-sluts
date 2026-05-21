@@ -40,17 +40,6 @@ function ContestantAvatarTick({ x, y, payload, contestantMap }: any) {
 
   return (
     <g>
-      {isSoleSurvivor && (
-        <text
-          x={textX - 4}
-          y={y}
-          textAnchor="end"
-          dominantBaseline="central"
-          fontSize={10}
-        >
-          ⭐
-        </text>
-      )}
       {tribeColor && (
         <circle cx={x - radius - 2} cy={y} r={radius + outlineWidth} fill={tribeColor} />
       )}
