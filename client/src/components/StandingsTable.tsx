@@ -8,6 +8,7 @@ interface Team {
   name: string;
   imageUrl?: string;
   totalPoints: number;
+  isWinner?: boolean;
 }
 
 interface StandingsTableProps {
@@ -36,11 +37,24 @@ export default function StandingsTable({ teams }: StandingsTableProps) {
           </TableHeader>
           <TableBody>
             {sortedTeams.map((team, index) => (
-              <TableRow key={team.id} data-testid={`row-team-${team.id}`}>
+              <TableRow
+                key={team.id}
+                data-testid={`row-team-${team.id}`}
+                className={team.isWinner ? "bg-amber-50/60 dark:bg-amber-900/10" : ""}
+              >
                 <TableCell className="text-center">
-                  <span className="text-xl font-bold text-muted-foreground">
-                    {index + 1}
-                  </span>
+                  {team.isWinner ? (
+                    <img
+                      src="/trophy.svg"
+                      alt="Champion"
+                      className="h-7 w-7 mx-auto"
+                      data-testid={`icon-champion-${team.id}`}
+                    />
+                  ) : (
+                    <span className="text-xl font-bold text-muted-foreground">
+                      {index + 1}
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -50,7 +64,16 @@ export default function StandingsTable({ teams }: StandingsTableProps) {
                         {team.name.substring(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="font-semibold text-lg">{team.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`font-semibold text-lg ${team.isWinner ? "text-amber-700" : ""}`}>
+                        {team.name}
+                      </span>
+                      {team.isWinner && (
+                        <span className="text-xs font-semibold uppercase tracking-wide text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                          Champion
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell className="text-right">

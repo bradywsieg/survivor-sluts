@@ -32,6 +32,7 @@ interface Team {
   name: string;
   imageUrl?: string;
   seasonId?: number;
+  isWinner?: boolean;
 }
 
 export default function Teams() {
@@ -96,7 +97,7 @@ export default function Teams() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; imageUrl?: string | null }) => 
+    mutationFn: (data: { name: string; imageUrl?: string | null; isWinner: boolean }) => 
       apiRequest("POST", "/api/teams", { ...data, seasonId: selectedSeasonId ? parseInt(selectedSeasonId) : undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
@@ -109,7 +110,7 @@ export default function Teams() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name: string; imageUrl?: string | null } }) => 
+    mutationFn: ({ id, data }: { id: number; data: { name: string; imageUrl?: string | null; isWinner: boolean } }) => 
       apiRequest("PATCH", `/api/teams/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
@@ -144,7 +145,7 @@ export default function Teams() {
     return contestantPoints + bonusPoints;
   };
 
-  const handleSubmit = (data: { name: string; imageUrl?: string | null }) => {
+  const handleSubmit = (data: { name: string; imageUrl?: string | null; isWinner: boolean }) => {
     if (editingTeam) {
       updateMutation.mutate({ id: editingTeam.id, data });
     } else {
@@ -251,7 +252,7 @@ export default function Teams() {
         <TeamFormDialog
           open={dialogOpen}
           onOpenChange={handleDialogClose}
-          initialData={editingTeam ? { id: editingTeam.id, name: editingTeam.name, imageUrl: editingTeam.imageUrl } : undefined}
+          initialData={editingTeam ? { id: editingTeam.id, name: editingTeam.name, imageUrl: editingTeam.imageUrl, isWinner: editingTeam.isWinner } : undefined}
           onSubmit={handleSubmit}
         />
       </div>

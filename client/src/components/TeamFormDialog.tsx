@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
 import { Upload } from "lucide-react";
 
 interface TeamFormDialogProps {
@@ -13,8 +14,9 @@ interface TeamFormDialogProps {
     id?: number;
     name: string;
     imageUrl?: string | null;
+    isWinner?: boolean;
   };
-  onSubmit: (data: { name: string; imageUrl?: string | null }) => void;
+  onSubmit: (data: { name: string; imageUrl?: string | null; isWinner: boolean }) => void;
 }
 
 export default function TeamFormDialog({ 
@@ -25,19 +27,21 @@ export default function TeamFormDialog({
 }: TeamFormDialogProps) {
   const [name, setName] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [isWinner, setIsWinner] = useState(false);
   const isEditing = !!initialData?.id;
 
   useEffect(() => {
     if (open) {
       setName(initialData?.name || "");
       setImageUrl(initialData?.imageUrl || "");
+      setIsWinner(initialData?.isWinner || false);
     }
   }, [open, initialData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      onSubmit({ name: name.trim(), imageUrl: imageUrl.trim() || null });
+      onSubmit({ name: name.trim(), imageUrl: imageUrl.trim() || null, isWinner });
       onOpenChange(false);
     }
   };
@@ -89,6 +93,24 @@ export default function TeamFormDialog({
               </div>
             </div>
           </div>
+
+          {isEditing && (
+            <div className="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-200">
+              <div>
+                <Label htmlFor="isWinner" className="cursor-pointer font-semibold text-amber-800">
+                  🏆 League Champion
+                </Label>
+                <p className="text-xs text-amber-600 mt-0.5">Mark this team as the season winner</p>
+              </div>
+              <Switch
+                id="isWinner"
+                checked={isWinner}
+                onCheckedChange={setIsWinner}
+                data-testid="switch-team-winner"
+              />
+            </div>
+          )}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

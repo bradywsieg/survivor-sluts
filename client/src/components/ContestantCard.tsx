@@ -15,6 +15,7 @@ interface ContestantCardProps {
   tribeColor?: string;
   tribeName?: string;
   bio?: string;
+  isSoleSurvivor?: boolean;
   onEdit?: (id: number) => void;
   onDelete?: (id: number) => void;
 }
@@ -29,6 +30,7 @@ export default function ContestantCard({
   tribeColor,
   tribeName,
   bio,
+  isSoleSurvivor = false,
   onEdit, 
   onDelete 
 }: ContestantCardProps) {
@@ -39,24 +41,37 @@ export default function ContestantCard({
   const bioIsTruncated = hasBio && bio.length > bioPreviewLength;
   const displayBio = bioExpanded ? bio : bio?.substring(0, bioPreviewLength);
 
+  const borderStyle = isSoleSurvivor
+    ? { borderLeft: "4px solid #f59e0b" }
+    : tribeColor
+    ? { borderLeft: `4px solid ${tribeColor}` }
+    : undefined;
+
   return (
     <Card 
-      className={`group ${eliminated ? 'opacity-60' : ''}`}
-      style={tribeColor ? { borderLeft: `4px solid ${tribeColor}` } : undefined}
+      className={`group ${eliminated ? 'opacity-60' : ''} ${isSoleSurvivor ? 'bg-amber-50/40' : ''}`}
+      style={borderStyle}
       data-testid={`card-contestant-${id}`}
     >
       <CardContent className="p-4">
+        {isSoleSurvivor && (
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-amber-600">⭐ Sole Survivor</span>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <Avatar className="h-12 w-12 shrink-0">
-              <AvatarImage src={imageUrl} alt={name} />
-              <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                {name.substring(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative shrink-0">
+              <Avatar className={`h-12 w-12 ${isSoleSurvivor ? "ring-2 ring-amber-400 ring-offset-1" : ""}`}>
+                <AvatarImage src={imageUrl} alt={name} />
+                <AvatarFallback className={`font-semibold ${isSoleSurvivor ? "bg-amber-100 text-amber-700" : "bg-primary/10 text-primary"}`}>
+                  {name.substring(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold truncate">{name}</h3>
+                <h3 className={`font-semibold truncate ${isSoleSurvivor ? "text-amber-800" : ""}`}>{name}</h3>
                 {eliminated && (
                   <Badge variant="destructive" className="text-xs">Eliminated</Badge>
                 )}

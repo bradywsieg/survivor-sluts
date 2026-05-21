@@ -42,6 +42,7 @@ export const teams = pgTable("teams", {
   name: text("name").notNull(),
   imageUrl: text("image_url"),
   seasonId: integer("season_id").references(() => seasons.id),
+  isWinner: boolean("is_winner").default(false).notNull(),
 });
 
 export const teamsRelations = relations(teams, ({ one, many }) => ({
@@ -63,6 +64,7 @@ export const contestants = pgTable("contestants", {
   seasonId: integer("season_id").references(() => seasons.id),
   tribeId: integer("tribe_id").references(() => tribes.id),
   bio: text("bio"),
+  isSoleSurvivor: boolean("is_sole_survivor").default(false).notNull(),
 });
 
 export const contestantsRelations = relations(contestants, ({ one, many }) => ({

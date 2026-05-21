@@ -12,6 +12,7 @@ interface ContestantData {
   points: number;
   eliminated?: boolean;
   tribeColor?: string;
+  isSoleSurvivor?: boolean;
 }
 
 interface Week {
@@ -23,7 +24,7 @@ interface ContestantPerformanceChartProps {
   data: ContestantData[];
   weeks: Week[];
   weeklyContestantScores: Record<number, { contestantId: number; points: number }[]>;
-  contestants: { id: number; name: string; imageUrl?: string; eliminated?: boolean }[];
+  contestants: { id: number; name: string; imageUrl?: string; eliminated?: boolean; isSoleSurvivor?: boolean }[];
 }
 
 function ContestantAvatarTick({ x, y, payload, contestantMap }: any) {
@@ -31,6 +32,7 @@ function ContestantAvatarTick({ x, y, payload, contestantMap }: any) {
   const imageUrl = contestant?.imageUrl;
   const contestantId = contestant?.id || 0;
   const tribeColor = contestant?.tribeColor;
+  const isSoleSurvivor = contestant?.isSoleSurvivor;
   const name = payload.value;
   const radius = 10;
   const textX = x - radius * 2 - 6;
@@ -38,8 +40,22 @@ function ContestantAvatarTick({ x, y, payload, contestantMap }: any) {
 
   return (
     <g>
+      {isSoleSurvivor && (
+        <text
+          x={textX - 4}
+          y={y}
+          textAnchor="end"
+          dominantBaseline="central"
+          fontSize={10}
+        >
+          ⭐
+        </text>
+      )}
       {tribeColor && (
         <circle cx={x - radius - 2} cy={y} r={radius + outlineWidth} fill={tribeColor} />
+      )}
+      {isSoleSurvivor && !tribeColor && (
+        <circle cx={x - radius - 2} cy={y} r={radius + 2} fill="#f59e0b" />
       )}
       {imageUrl ? (
         <g>
@@ -79,12 +95,30 @@ function ContestantAvatarTick({ x, y, payload, contestantMap }: any) {
         y={y}
         textAnchor="end"
         dominantBaseline="central"
-        fill="hsl(var(--muted-foreground))"
+        fill={isSoleSurvivor ? "#b45309" : "hsl(var(--muted-foreground))"}
         fontSize={12}
+        fontWeight={isSoleSurvivor ? "bold" : "normal"}
       >
         {name}
       </text>
     </g>
+  );
+}
+
+function SoleSurvivorLabel(props: any) {
+  const { x, y, width, value, isSoleSurvivorMap } = props;
+  const isSole = isSoleSurvivorMap?.[value];
+  if (!isSole) return null;
+  return (
+    <text
+      x={x + width + 6}
+      y={y + 10}
+      fill="#b45309"
+      fontSize={10}
+      fontWeight="bold"
+    >
+      ⭐ Sole Survivor
+    </text>
   );
 }
 
@@ -102,9 +136,9 @@ export default function ContestantPerformanceChart({
   const activeWeekId = selectedWeekId || latestWeekId;
 
   const contestantMap = useMemo(() => {
-    const map: Record<string, { id: number; imageUrl?: string; tribeColor?: string }> = {};
+    const map: Record<string, { id: number; imageUrl?: string; tribeColor?: string; isSoleSurvivor?: boolean }> = {};
     data.forEach(c => {
-      map[c.name] = { id: c.id, imageUrl: c.imageUrl, tribeColor: c.tribeColor };
+      map[c.name] = { id: c.id, imageUrl: c.imageUrl, tribeColor: c.tribeColor, isSoleSurvivor: c.isSoleSurvivor };
     });
     return map;
   }, [data]);
@@ -127,6 +161,7 @@ export default function ContestantPerformanceChart({
           points: scoreMap.get(c.id) || 0,
           eliminated: c.eliminated,
           tribeColor: d?.tribeColor,
+          isSoleSurvivor: c.isSoleSurvivor,
         };
       })
       .sort((a, b) => b.points - a.points);
@@ -192,7 +227,7 @@ export default function ContestantPerformanceChart({
             <BarChart 
               data={chartData} 
               layout="vertical" 
-              margin={{ top: 5, right: 40, left: 0, bottom: 5 }}
+              margin={{ top: 5, right: 110, left: 0, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
               <XAxis 
@@ -220,8 +255,14 @@ export default function ContestantPerformanceChart({
                 {chartData.map((entry, index) => (
                   <Cell 
                     key={`cell-${index}`} 
-                    fill={entry.eliminated ? 'hsl(var(--muted))' : 'hsl(178, 65%, 32%)'}
-                    opacity={entry.eliminated ? 0.5 : 1}
+                    fill={
+                      entry.isSoleSurvivor
+                        ? '#f59e0b'
+                        : entry.eliminated
+                        ? 'hsl(var(--muted))'
+                        : 'hsl(178, 65%, 32%)'
+                    }
+                    opacity={entry.eliminated && !entry.isSoleSurvivor ? 0.5 : 1}
                   />
                 ))}
                 <LabelList 
@@ -231,6 +272,27 @@ export default function ContestantPerformanceChart({
                   fontSize={12}
                   fontWeight="bold"
                   formatter={(value: number) => value > 0 ? value : ""}
+                />
+                <LabelList
+                  dataKey="name"
+                  content={(props: any) => {
+                    const entry = chartData.find(d => d.name === props.value);
+                    if (!entry?.isSoleSurvivor) return null;
+                    const { x, y, width } = props;
+                    const pts = entry.points;
+                    const labelX = (x ?? 0) + (width ?? 0) + (String(pts).length * 8) + 12;
+                    return (
+                      <text
+                        x={labelX}
+                        y={(y ?? 0) + 10}
+                        fill="#b45309"
+                        fontSize={10}
+                        fontWeight="bold"
+                      >
+                        ⭐ Sole Survivor
+                      </text>
+                    );
+                  }}
                 />
               </Bar>
             </BarChart>

@@ -33,8 +33,9 @@ interface ContestantFormDialogProps {
     eliminated?: boolean;
     tribeId?: number;
     bio?: string;
+    isSoleSurvivor?: boolean;
   };
-  onSubmit: (data: { name: string; imageUrl?: string | null; teamId?: number; eliminated: boolean; tribeId?: number | null; bio?: string | null }) => void;
+  onSubmit: (data: { name: string; imageUrl?: string | null; teamId?: number; eliminated: boolean; tribeId?: number | null; bio?: string | null; isSoleSurvivor: boolean }) => void;
 }
 
 export default function ContestantFormDialog({ 
@@ -51,6 +52,7 @@ export default function ContestantFormDialog({
   const [eliminated, setEliminated] = useState(false);
   const [tribeId, setTribeId] = useState<string>("");
   const [bio, setBio] = useState("");
+  const [isSoleSurvivor, setIsSoleSurvivor] = useState(false);
   const isEditing = !!initialData?.id;
 
   useEffect(() => {
@@ -61,6 +63,7 @@ export default function ContestantFormDialog({
       setEliminated(initialData?.eliminated || false);
       setTribeId(initialData?.tribeId?.toString() || "");
       setBio(initialData?.bio || "");
+      setIsSoleSurvivor(initialData?.isSoleSurvivor || false);
     }
   }, [open, initialData]);
 
@@ -74,6 +77,7 @@ export default function ContestantFormDialog({
         eliminated,
         tribeId: tribeId && tribeId !== "none" ? parseInt(tribeId) : null,
         bio: bio.trim() || null,
+        isSoleSurvivor,
       });
       onOpenChange(false);
     }
@@ -188,6 +192,21 @@ export default function ContestantFormDialog({
               checked={eliminated}
               onCheckedChange={setEliminated}
               data-testid="switch-contestant-eliminated"
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-200">
+            <div>
+              <Label htmlFor="isSoleSurvivor" className="cursor-pointer font-semibold text-amber-800">
+                ⭐ Sole Survivor
+              </Label>
+              <p className="text-xs text-amber-600 mt-0.5">Mark as the season winner</p>
+            </div>
+            <Switch
+              id="isSoleSurvivor"
+              checked={isSoleSurvivor}
+              onCheckedChange={setIsSoleSurvivor}
+              data-testid="switch-contestant-sole-survivor"
             />
           </div>
 
