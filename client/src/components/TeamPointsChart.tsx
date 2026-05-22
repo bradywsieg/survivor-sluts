@@ -1,3 +1,4 @@
+import { useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { TrendingUp } from "lucide-react";
@@ -73,6 +74,14 @@ function TeamAvatarDot({ cx, cy, index, teamName, teamImages, color, isLast }: a
 
 export default function TeamPointsChart({ data, teamNames, teamImages }: TeamPointsChartProps) {
   const lastIndex = data.length - 1;
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to the right (latest week) on mount and when data changes
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    }
+  }, [data]);
 
   return (
     <Card>
@@ -83,11 +92,17 @@ export default function TeamPointsChart({ data, teamNames, teamImages }: TeamPoi
         </CardTitle>
       </CardHeader>
       <CardContent className="px-2 sm:px-6">
-        {/* Scrollable wrapper for mobile */}
-        <div className="overflow-x-auto -mx-2 sm:mx-0">
-          <div style={{ minWidth: Math.max(320, teamNames.length * 80 + data.length * 60) }} className="h-80">
+        {/* Scrollable wrapper — auto-scrolled to the right (latest week) */}
+        <div ref={scrollRef} className="overflow-x-auto -mx-2 sm:mx-0">
+          <div
+            style={{ minWidth: Math.max(320, data.length * 60 + 80) }}
+            className="h-80"
+          >
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 5, right: 36, left: 0, bottom: 5 }}>
+              <LineChart
+                data={data}
+                margin={{ top: 20, right: 44, left: 0, bottom: 5 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis
                   dataKey="week"
