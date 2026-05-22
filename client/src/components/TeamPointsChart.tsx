@@ -82,55 +82,61 @@ export default function TeamPointsChart({ data, teamNames, teamImages }: TeamPoi
           Team Scoring by Week
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 5, right: 40, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey="week" 
-                className="text-sm"
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <YAxis 
-                className="text-sm"
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '0.5rem'
-                }}
-              />
-              <Legend />
-              {teamNames.map((name, index) => {
-                const color = CHART_COLORS[index % CHART_COLORS.length];
-                return (
-                  <Line
-                    key={name}
-                    type="monotone"
-                    dataKey={name}
-                    stroke={color}
-                    strokeWidth={2}
-                    dot={(props: any) => (
-                      <TeamAvatarDot
-                        key={props.key}
-                        cx={props.cx}
-                        cy={props.cy}
-                        index={index}
-                        teamName={name}
-                        teamImages={teamImages}
-                        color={color}
-                        isLast={props.index === lastIndex}
-                      />
-                    )}
-                    activeDot={{ r: 6 }}
-                  />
-                );
-              })}
-            </LineChart>
-          </ResponsiveContainer>
+      <CardContent className="px-2 sm:px-6">
+        {/* Scrollable wrapper for mobile */}
+        <div className="overflow-x-auto -mx-2 sm:mx-0">
+          <div style={{ minWidth: Math.max(320, teamNames.length * 80 + data.length * 60) }} className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data} margin={{ top: 5, right: 36, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis
+                  dataKey="week"
+                  className="text-xs"
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  className="text-xs"
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                  width={36}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '0.5rem',
+                    fontSize: 12,
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                {teamNames.map((name, index) => {
+                  const color = CHART_COLORS[index % CHART_COLORS.length];
+                  return (
+                    <Line
+                      key={name}
+                      type="monotone"
+                      dataKey={name}
+                      stroke={color}
+                      strokeWidth={2}
+                      dot={(props: any) => (
+                        <TeamAvatarDot
+                          key={props.key}
+                          cx={props.cx}
+                          cy={props.cy}
+                          index={index}
+                          teamName={name}
+                          teamImages={teamImages}
+                          color={color}
+                          isLast={props.index === lastIndex}
+                        />
+                      )}
+                      activeDot={{ r: 6 }}
+                    />
+                  );
+                })}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </CardContent>
     </Card>

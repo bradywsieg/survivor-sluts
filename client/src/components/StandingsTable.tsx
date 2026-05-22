@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Trophy } from "lucide-react";
 
@@ -9,11 +8,16 @@ interface Team {
   imageUrl?: string;
   totalPoints: number;
   isWinner?: boolean;
+  hasSoleSurvivor?: boolean;
 }
 
 interface StandingsTableProps {
   teams: Team[];
 }
+
+const torchStyle: React.CSSProperties = {
+  filter: "brightness(0) saturate(100%) invert(23%) sepia(95%) saturate(900%) hue-rotate(335deg)",
+};
 
 export default function StandingsTable({ teams }: StandingsTableProps) {
   const sortedTeams = [...teams].sort((a, b) => b.totalPoints - a.totalPoints);
@@ -26,66 +30,78 @@ export default function StandingsTable({ teams }: StandingsTableProps) {
           Team Standings
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-16 text-center">Rank</TableHead>
-              <TableHead>Team</TableHead>
-              <TableHead className="text-right">Points</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedTeams.map((team, index) => (
-              <TableRow
-                key={team.id}
-                data-testid={`row-team-${team.id}`}
-                className={team.isWinner ? "bg-amber-50/60 dark:bg-amber-900/10" : ""}
-              >
-                <TableCell className="text-center">
-                  {team.isWinner ? (
+      <CardContent className="px-2 sm:px-6">
+        <div className="w-full">
+          {/* Header */}
+          <div className="grid grid-cols-[2.5rem_1fr_auto] gap-2 px-2 pb-2 border-b text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <span className="text-center">#</span>
+            <span>Team</span>
+            <span>Pts</span>
+          </div>
+          {/* Rows */}
+          {sortedTeams.map((team, index) => (
+            <div
+              key={team.id}
+              data-testid={`row-team-${team.id}`}
+              className={`grid grid-cols-[2.5rem_1fr_auto] gap-2 items-center px-2 py-3 border-b last:border-0 ${
+                team.isWinner ? "bg-amber-50/60 dark:bg-amber-900/10" : ""
+              }`}
+            >
+              {/* Rank */}
+              <span className="text-center text-lg font-bold text-muted-foreground">
+                {index + 1}
+              </span>
+
+              {/* Team info */}
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Avatar className="h-9 w-9 shrink-0">
+                  <AvatarImage src={team.imageUrl} alt={team.name} />
+                  <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
+                    {team.name.substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span
+                  className={`font-semibold truncate ${
+                    team.isWinner ? "text-amber-700" : ""
+                  }`}
+                >
+                  {team.name}
+                </span>
+                {/* Icons next to name */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {team.isWinner && (
                     <img
                       src="/trophy.svg"
                       alt="Champion"
-                      className="h-7 w-7 mx-auto"
+                      title="Team Champion"
+                      className="h-5 w-5"
+                      style={torchStyle}
                       data-testid={`icon-champion-${team.id}`}
                     />
-                  ) : (
-                    <span className="text-xl font-bold text-muted-foreground">
-                      {index + 1}
-                    </span>
                   )}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={team.imageUrl} alt={team.name} />
-                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                        {team.name.substring(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex items-center gap-2">
-                      <span className={`font-semibold text-lg ${team.isWinner ? "text-amber-700" : ""}`}>
-                        {team.name}
-                      </span>
-                      {team.isWinner && (
-                        <span className="text-xs font-semibold uppercase tracking-wide text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
-                          Champion
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <span className="text-lg font-semibold">{team.totalPoints}</span>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {sortedTeams.length === 0 && (
-          <p className="text-center text-muted-foreground py-8">No teams yet. Create your first team to get started!</p>
-        )}
+                  {team.hasSoleSurvivor && (
+                    <img
+                      src="/torch.png"
+                      alt="Sole Survivor"
+                      title="Sole Survivor"
+                      className="h-5 w-5"
+                      style={torchStyle}
+                      data-testid={`icon-sole-survivor-${team.id}`}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Points */}
+              <span className="font-semibold text-base tabular-nums">{team.totalPoints}</span>
+            </div>
+          ))}
+          {sortedTeams.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">
+              No teams yet. Create your first team to get started!
+            </p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

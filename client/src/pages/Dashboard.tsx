@@ -29,8 +29,8 @@ interface IdolWatchItem {
 }
 
 interface DashboardData {
-  teams: { id: number; name: string; imageUrl?: string; totalPoints: number; contestants: any[] }[];
-  contestants: { id: number; name: string; imageUrl?: string; totalPoints: number; teamName?: string; eliminated?: boolean; tribeId?: number | null }[];
+  teams: { id: number; name: string; imageUrl?: string; totalPoints: number; isWinner?: boolean; contestants: any[] }[];
+  contestants: { id: number; name: string; imageUrl?: string; totalPoints: number; teamName?: string; teamId?: number | null; eliminated?: boolean; tribeId?: number | null; isSoleSurvivor?: boolean }[];
   weeks: { id: number; weekNumber: number }[];
   weeklyData: Record<string, string | number>[];
   teamNames: string[];
@@ -99,6 +99,15 @@ export default function Dashboard() {
   const tribesList = data?.tribes || [];
   const idolWatch = data?.idolWatch || [];
 
+  // Determine which teams have the Sole Survivor contestant
+  const soleSurvivorTeamIds = new Set(
+    contestants.filter(c => c.isSoleSurvivor && c.teamId).map(c => c.teamId)
+  );
+  const teamsWithFlags = teams.map(t => ({
+    ...t,
+    hasSoleSurvivor: soleSurvivorTeamIds.has(t.id),
+  }));
+
   const contestantChartData = contestants.map(c => {
     const tribe = tribesList.find(t => t.id === c.tribeId);
     return {
@@ -126,7 +135,7 @@ export default function Dashboard() {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8">
-          <StandingsTable teams={teams} />
+          <StandingsTable teams={teamsWithFlags} />
           {weeklyData.length > 0 && teamNames.length > 0 ? (
             <TeamPointsChart data={weeklyData} teamNames={teamNames} teamImages={teamImages} />
           ) : (
