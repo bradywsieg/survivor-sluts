@@ -1,0 +1,1 @@
+- [Season scoring backfills](season-scoring-backfills.md) — Add only new rule keys to existing seasons; older saved rubrics can use different keys for otherwise similar events.

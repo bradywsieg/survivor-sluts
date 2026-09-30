@@ -15,7 +15,7 @@ function requirePin(req: Request, res: Response, next: NextFunction) {
   return res.status(401).json({ error: "Invalid PIN" });
 }
 
-const defaultEvents: { eventKey: string; eventName: string; points: number }[] = [
+const baseEvents: { eventKey: string; eventName: string; points: number }[] = [
   { eventKey: "1st-place", eventName: "1st Place", points: 100 },
   { eventKey: "2nd-place", eventName: "2nd Place", points: 60 },
   { eventKey: "3rd-place", eventName: "3rd Place", points: 60 },
@@ -59,6 +59,21 @@ const defaultEvents: { eventKey: string; eventName: string; points: number }[] =
   { eventKey: "plays-idol-at-tribal", eventName: "Plays idol at tribal", points: 10 },
   { eventKey: "plays-advantage-extra-vote-steal-vote-etc", eventName: "Plays advantage (extra vote, steal vote etc.)", points: 10 },
 ];
+
+const additionalEvents: typeof baseEvents = [
+  { eventKey: "votes-against-someone-in-their-alliance", eventName: "Votes against someone in their alliance", points: 5 },
+  { eventKey: "flips-the-mr-beast-coin-successfully", eventName: "Flips the Mr Beast Coin successfully", points: 10 },
+  { eventKey: "voluntarily-sits-out-of-a-challenge", eventName: "Voluntarily sits out of a challenge", points: -5 },
+  { eventKey: "makes-it-to-final-tribal-without-receiving-any-prior-votes", eventName: "Makes it to Final Tribal without receiving any prior votes", points: 10 },
+  { eventKey: "makes-it-to-final-tribal-but-received-zero-votes", eventName: "Makes it to final tribal but received ZERO votes", points: -10 },
+  { eventKey: "refers-to-jeff-as-uncle-jeff-or-mr-jeff", eventName: 'Refers to Jeff as "Uncle Jeff" or "Mr Jeff"', points: -1 },
+  { eventKey: "successful-vote-cast-at-tribal", eventName: "Successful vote cast at tribal", points: 2 },
+  { eventKey: "unsuccessful-vote-cast-at-tribal", eventName: "Unsuccessful vote cast at tribal", points: -2 },
+  { eventKey: "most-votes-at-tribal-by-end-of-season", eventName: "Most votes at tribal by end of season", points: 10 },
+  { eventKey: "held-nose-when-jumping-in-water", eventName: "Held nose when jumping in water", points: -3 },
+];
+
+const defaultEvents = [...baseEvents, ...additionalEvents];
 
 export async function registerRoutes(
   httpServer: Server,
@@ -515,11 +530,9 @@ export async function registerRoutes(
   app.get("/api/seasons/:seasonId/events", async (req, res) => {
     try {
       const seasonId = parseInt(req.params.seasonId);
-      let events = await storage.getSeasonEventSettings(seasonId);
-      if (events.length === 0 && defaultEvents.length > 0) {
-        await storage.seedSeasonEvents(seasonId, defaultEvents);
-        events = await storage.getSeasonEventSettings(seasonId);
-      }
+      const existing = await storage.getSeasonEventSettings(seasonId);
+      await storage.seedSeasonEvents(seasonId, existing.length === 0 ? defaultEvents : additionalEvents);
+      const events = await storage.getSeasonEventSettings(seasonId);
       res.json(events);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch event settings" });

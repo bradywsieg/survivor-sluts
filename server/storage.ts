@@ -356,9 +356,8 @@ export class DatabaseStorage implements IStorage {
 
   async seedSeasonEvents(seasonId: number, events: { eventKey: string; eventName: string; points: number }[]): Promise<void> {
     const existing = await this.getSeasonEventSettings(seasonId);
-    if (existing.length > 0) return;
-
-    const values = events.map(e => ({
+    const existingKeys = new Set(existing.map(e => e.eventKey));
+    const values = events.filter(e => !existingKeys.has(e.eventKey)).map(e => ({
       seasonId,
       eventKey: e.eventKey,
       eventName: e.eventName,
@@ -366,7 +365,8 @@ export class DatabaseStorage implements IStorage {
     }));
 
     if (values.length > 0) {
-      await db.insert(seasonEventSettings).values(values);
+      await db.insert(seasonEventSettings).values(values)
+        .onConflictDoNothing({ target: [seasonEventSettings.seasonId, seasonEventSettings.eventKey] });
     }
   }
 
